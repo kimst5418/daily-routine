@@ -91,6 +91,8 @@ type CalendarStatusFilter = 'ALL' | 'DONE' | 'PENDING' | 'IN_PROGRESS';
 export default function App() {
   const reminderEngineRunningRef = useRef(false);
   const [activeTab, setActiveTab] = useState<AppTab>('today');
+  const [showTaskHelp, setShowTaskHelp] = useState(false);
+  const [showReminderHelp, setShowReminderHelp] = useState(false);
   const [dbReady, setDbReady] = useState(false);
   const [permissionLabel, setPermissionLabel] = useState(
     isExpoGo() ? 'Expo Go에서는 알림 비활성화' : '알림 권한 확인 필요'
@@ -126,6 +128,12 @@ export default function App() {
   const [savingRule, setSavingRule] = useState(false);
 
   const today = toDateKey(new Date());
+  const activeReminderRuleCount = rules.filter((rule) => rule.isActive).length;
+  const todayDoneCount = todayItems.filter((item) => item.status === 'DONE').length;
+  const todayInProgressCount = todayItems.filter((item) => item.status === 'IN_PROGRESS').length;
+  const todayPendingCount = todayItems.filter((item) => item.status === 'PENDING').length;
+  const activeCalendarFilterCount =
+    (calendarStatusFilter === 'ALL' ? 0 : 1) + (calendarCategoryFilter === 'ALL' ? 0 : 1);
   const monthGrid = buildMonthGrid(visibleMonth);
   const weekGrid = buildWeekGrid(selectedDate);
   const calendarGrid = calendarViewMode === 'MONTH' ? monthGrid : weekGrid;
@@ -154,6 +162,45 @@ export default function App() {
     return matchesStatus && matchesCategory;
   });
   const monthPickerLabel = `${monthPickerYear}년`;
+
+  const heroContent: Record<
+    AppTab,
+    {
+      eyebrow: string;
+      title: string;
+      subtitle: string;
+      stats?: Array<{ label: string; value: string }>;
+    }
+  > = {
+    today: {
+      eyebrow: '오늘 집중',
+      title: '오늘 루틴',
+      subtitle:
+        todayItems.length > 0
+          ? `${todayDoneCount}개 완료, ${todayInProgressCount}개 진행 중`
+          : '오늘 표시할 루틴이 없습니다.',
+      stats: [
+        { label: '완료', value: `${todayDoneCount}` },
+        { label: '진행중', value: `${todayInProgressCount}` },
+        { label: '예정', value: `${todayPendingCount}` },
+      ],
+    },
+    calendar: {
+      eyebrow: '기록 보기',
+      title: '달력',
+      subtitle: activeCalendarFilterCount > 0 ? `필터 ${activeCalendarFilterCount}개 적용됨` : '',
+    },
+    tasks: {
+      eyebrow: '루틴 관리',
+      title: '테스크',
+      subtitle: editingTaskId ? '수정 중' : '',
+    },
+    reminders: {
+      eyebrow: '알림 규칙',
+      title: '알림',
+      subtitle: activeReminderRuleCount > 0 ? `${activeReminderRuleCount}개 활성` : '',
+    },
+  };
 
   function filterCalendarItems(items: TodayTaskItem[]) {
     return items.filter((item) => {
@@ -200,6 +247,38 @@ export default function App() {
     }
   }
 
+  function getTaskStatusTone(status: TodayTaskItem['status']) {
+    switch (status) {
+      case 'DONE':
+        return {
+          container: styles.statusBadgeDone,
+          text: styles.statusBadgeDoneText,
+        };
+      case 'IN_PROGRESS':
+        return {
+          container: styles.statusBadgeInProgress,
+          text: styles.statusBadgeInProgressText,
+        };
+      default:
+        return {
+          container: styles.statusBadgePending,
+          text: styles.statusBadgePendingText,
+        };
+    }
+  }
+
+  function getStatusActionLabel(item: TodayTaskItem) {
+    if (item.status === 'DONE') {
+      return '완료 취소';
+    }
+
+    if (item.status === 'IN_PROGRESS') {
+      return '진행 중단';
+    }
+
+    return rules.some((rule) => rule.isActive && rule.templateId === item.task.id) ? '시작하기' : '완료 처리';
+  }
+
   function getWeekdayLabel(dateKey: string) {
     return weekdays[fromDateKey(dateKey).getDay()]?.label ?? '';
   }
@@ -239,6 +318,11 @@ export default function App() {
   function jumpToToday() {
     setVisibleMonth(getMonthStart(today));
     void handleSelectDate(today, getMonthStart(today));
+  }
+
+  function resetCalendarFilters() {
+    setCalendarStatusFilter('ALL');
+    setCalendarCategoryFilter('ALL');
   }
 
   function openMonthPicker() {
@@ -682,12 +766,21 @@ export default function App() {
       <StatusBar style="light" />
       <ScrollView contentContainerStyle={styles.content}>
         <View style={styles.hero}>
-          <Text style={styles.eyebrow}>Routine Check</Text>
-          <Text style={styles.title}>Android MVP 준비 완료</Text>
-          <Text style={styles.subtitle}>
-            반복 테스크, 달력 기록, 지연 알림, 반복 리마인드 알림을 위한 앱 베이스를
-            만들었습니다.
-          </Text>
+          <Text style={styles.eyebrow}>{heroContent[activeTab].eyebrow}</Text>
+          <Text style={styles.title}>{heroContent[activeTab].title}</Text>
+          {heroContent[activeTab].subtitle ? (
+            <Text style={styles.subtitle}>{heroContent[activeTab].subtitle}</Text>
+          ) : null}
+          {activeTab === 'today' && heroContent.today.stats ? (
+            <View style={styles.heroStatsRow}>
+              {heroContent.today.stats.map((stat) => (
+                <View key={stat.label} style={styles.heroStatCard}>
+                  <Text style={styles.heroStatLabel}>{stat.label}</Text>
+                  <Text style={styles.heroStatValue}>{stat.value}</Text>
+                </View>
+              ))}
+            </View>
+          ) : null}
         </View>
 
         <View style={styles.tabRow}>
@@ -732,9 +825,11 @@ export default function App() {
                         <Text style={styles.taskCategory}>{item.task.category}</Text>
                       </View>
                     </View>
-                    <Text style={styles.taskRepeat}>
-                      상태: {getTaskStatusLabel(item.status)}
-                    </Text>
+                    <View style={[styles.statusBadge, getTaskStatusTone(item.status).container]}>
+                      <Text style={[styles.statusBadgeText, getTaskStatusTone(item.status).text]}>
+                        {getTaskStatusLabel(item.status)}
+                      </Text>
+                    </View>
                     {item.status === 'DONE' ? (
                       <Text style={styles.taskRepeat}>
                         완료시간: {formatOptionalTime(item.checkedAt)}
@@ -759,15 +854,7 @@ export default function App() {
                       handleStatusPress(item.ticket.id, item.task.id, item.status, today)
                     }
                   >
-                    <Text style={styles.statusButtonText}>
-                      {item.status === 'DONE'
-                        ? '완료됨'
-                        : item.status === 'IN_PROGRESS'
-                          ? '진행중'
-                          : rules.some((rule) => rule.isActive && rule.templateId === item.task.id)
-                            ? '시작'
-                            : '완료 체크'}
-                    </Text>
+                    <Text style={styles.statusButtonText}>{getStatusActionLabel(item)}</Text>
                   </Pressable>
                 </View>
               ))
@@ -838,7 +925,19 @@ export default function App() {
               </View>
 
               <View style={styles.filterSection}>
-                <Text style={styles.fieldLabel}>달력 필터</Text>
+                <View style={styles.filterSummaryRow}>
+                  <Text style={styles.fieldLabel}>달력 필터</Text>
+                  {activeCalendarFilterCount > 0 ? (
+                    <Pressable style={styles.filterResetButton} onPress={resetCalendarFilters}>
+                      <Text style={styles.filterResetButtonText}>필터 초기화</Text>
+                    </Pressable>
+                  ) : null}
+                </View>
+                <Text style={styles.caption}>
+                  {activeCalendarFilterCount > 0
+                    ? `${activeCalendarFilterCount}개 필터가 적용되어 있습니다.`
+                    : '필요할 때만 상태나 카테고리로 좁혀 보세요.'}
+                </Text>
                 <View style={styles.filterBlock}>
                   <Text style={styles.filterLabel}>상태</Text>
                   <View style={styles.segmentedControlWide}>
@@ -972,13 +1071,21 @@ export default function App() {
 
             <View style={styles.panel}>
               <Text style={styles.panelTitle}>선택 날짜 상세</Text>
-              <Text style={styles.caption}>{selectedDate}</Text>
+              <Text style={styles.caption}>{`${selectedDate} · ${filteredSelectedItems.length}개`}</Text>
               {filteredSelectedItems.map((item) => (
                 <View key={item.ticket.id} style={styles.taskCard}>
                   <View style={styles.taskMeta}>
-                    <Text style={styles.taskCategory}>{item.task.category}</Text>
-                    <Text style={styles.taskTitle}>{item.task.title}</Text>
-                    <Text style={styles.taskRepeat}>상태: {getTaskStatusLabel(item.status)}</Text>
+                    <View style={styles.taskHeaderRow}>
+                      <Text style={styles.taskTitle}>{item.task.title}</Text>
+                      <View style={styles.taskCategoryBadge}>
+                        <Text style={styles.taskCategory}>{item.task.category}</Text>
+                      </View>
+                    </View>
+                    <View style={[styles.statusBadge, getTaskStatusTone(item.status).container]}>
+                      <Text style={[styles.statusBadgeText, getTaskStatusTone(item.status).text]}>
+                        {getTaskStatusLabel(item.status)}
+                      </Text>
+                    </View>
                     {item.status === 'DONE' ? (
                       <Text style={styles.taskRepeat}>완료시간: {formatOptionalTime(item.checkedAt)}</Text>
                     ) : null}
@@ -996,15 +1103,7 @@ export default function App() {
                       handleStatusPress(item.ticket.id, item.task.id, item.status, selectedDate)
                     }
                   >
-                    <Text style={styles.statusButtonText}>
-                      {item.status === 'DONE'
-                        ? '완료됨'
-                        : item.status === 'IN_PROGRESS'
-                          ? '진행중'
-                          : rules.some((rule) => rule.isActive && rule.templateId === item.task.id)
-                            ? '시작'
-                            : '완료 체크'}
-                    </Text>
+                    <Text style={styles.statusButtonText}>{getStatusActionLabel(item)}</Text>
                   </Pressable>
                 </View>
               ))}
@@ -1062,6 +1161,18 @@ export default function App() {
               <Text style={styles.panelTitle}>
                 {editingTaskId ? '테스크 수정' : '새 테스크 추가'}
               </Text>
+              <Pressable style={styles.helpToggle} onPress={() => setShowTaskHelp((prev) => !prev)}>
+                <Text style={styles.helpToggleText}>
+                  {showTaskHelp ? '입력 도움말 숨기기' : '입력 도움말 보기'}
+                </Text>
+              </Pressable>
+              {showTaskHelp ? (
+                <View style={styles.helperCard}>
+                  <Text style={styles.helperText}>
+                    루틴 전용 앱이므로 1회성 일정 없이 반복 규칙만 설정합니다. 수정 중에는 기존 흐름을 유지한 채 내용만 바꿉니다.
+                  </Text>
+                </View>
+              ) : null}
               <TextInput
                 placeholder="예: 퇴근 체크"
                 placeholderTextColor="#6b7280"
@@ -1146,7 +1257,7 @@ export default function App() {
               <View style={styles.inlineActionRow}>
                 <Pressable style={styles.buttonFlex} onPress={handleCreateTask} disabled={savingTask}>
                   <Text style={styles.buttonText}>
-                    {savingTask ? '저장 중...' : editingTaskId ? '수정 저장' : '테스크 추가'}
+                    {savingTask ? '저장 중...' : editingTaskId ? '수정 반영' : '루틴 추가'}
                   </Text>
                 </Pressable>
                 {editingTaskId ? (
@@ -1204,86 +1315,113 @@ export default function App() {
         {activeTab === 'reminders' ? (
           <View style={styles.panel}>
             <Text style={styles.panelTitle}>알림 규칙</Text>
-            <Text style={styles.caption}>
-              특정 테스크 종료 후 일정 시간이 지나면 알림을 시작하고, 해제 전까지 반복할 수
-              있습니다.
-            </Text>
-
-            <Text style={styles.fieldLabel}>기준 테스크</Text>
-            <View style={styles.chipRow}>
-              {tasks.map((task) => (
-                <Pressable
-                  key={task.id}
-                  style={[
-                    styles.chip,
-                    ruleTriggerTaskId === task.id ? styles.chipActive : styles.chipInactive,
-                  ]}
-                  onPress={() => {
-                    setRuleTriggerTaskId(task.id);
-                    if (!ruleMessage.trim()) {
-                      setRuleMessage(`${task.title} 종료 후 체크가 필요한지 확인해주세요.`);
-                    }
-                  }}
-                >
-                  <Text
-                    style={[
-                      styles.chipText,
-                      ruleTriggerTaskId === task.id
-                        ? styles.chipTextActive
-                        : styles.chipTextInactive,
-                    ]}
-                  >
-                    {task.title}
-                  </Text>
-                </Pressable>
-              ))}
-            </View>
-
-            <View style={styles.inlineInputs}>
-              <View style={styles.delayInputGroup}>
-                <View style={styles.delayInputBox}>
-                  <Text style={styles.fieldLabel}>지연 시간(시간)</Text>
-                  <TextInput
-                    style={styles.input}
-                    keyboardType="numeric"
-                    value={ruleDelayHours}
-                    onChangeText={setRuleDelayHours}
-                  />
-                </View>
-                <View style={styles.delayInputBox}>
-                  <Text style={styles.fieldLabel}>지연 시간(분)</Text>
-                  <TextInput
-                    style={styles.input}
-                    keyboardType="numeric"
-                    value={ruleDelayMinutes}
-                    onChangeText={setRuleDelayMinutes}
-                  />
-                </View>
+            <Pressable
+              style={styles.helpToggle}
+              onPress={() => setShowReminderHelp((prev) => !prev)}
+            >
+              <Text style={styles.helpToggleText}>
+                {showReminderHelp ? '설명 숨기기' : '설명 보기'}
+              </Text>
+            </Pressable>
+            {showReminderHelp ? (
+              <View style={styles.helperCard}>
+                <Text style={styles.helperText}>
+                  특정 루틴이 시작된 뒤 지연 시간 기준으로 확인 알림을 보냅니다. 각 루틴에는 활성 규칙을 1개만 연결할 수 있습니다.
+                </Text>
               </View>
-              <View style={styles.repeatInputBox}>
-                <Text style={styles.fieldLabel}>반복 간격(분)</Text>
+            ) : null}
+
+            {tasks.length > 0 ? (
+              <>
+                <Text style={styles.fieldLabel}>기준 테스크</Text>
+                <View style={styles.chipRow}>
+                  {tasks.map((task) => (
+                    <Pressable
+                      key={task.id}
+                      style={[
+                        styles.chip,
+                        ruleTriggerTaskId === task.id ? styles.chipActive : styles.chipInactive,
+                      ]}
+                      onPress={() => {
+                        setRuleTriggerTaskId(task.id);
+                        if (!ruleMessage.trim()) {
+                          setRuleMessage(`${task.title} 종료 후 체크가 필요한지 확인해주세요.`);
+                        }
+                      }}
+                    >
+                      <Text
+                        style={[
+                          styles.chipText,
+                          ruleTriggerTaskId === task.id
+                            ? styles.chipTextActive
+                            : styles.chipTextInactive,
+                        ]}
+                      >
+                        {task.title}
+                      </Text>
+                    </Pressable>
+                  ))}
+                </View>
+
+                <View style={styles.helperCard}>
+                  <Text style={styles.helperTitle}>현재 설정 미리보기</Text>
+                  <Text style={styles.helperText}>
+                    {triggerTaskName} 시작 후 {ruleDelayHours}시간 {ruleDelayMinutes}분이 지나면 알림이
+                    시작되고, 이후 {ruleRepeatMinutes}분 간격으로 반복됩니다.
+                  </Text>
+                </View>
+
+                <View style={styles.inlineInputs}>
+                  <View style={styles.delayInputGroup}>
+                    <View style={styles.delayInputBox}>
+                      <Text style={styles.fieldLabel}>지연 시간(시간)</Text>
+                      <TextInput
+                        style={styles.input}
+                        keyboardType="numeric"
+                        value={ruleDelayHours}
+                        onChangeText={setRuleDelayHours}
+                      />
+                    </View>
+                    <View style={styles.delayInputBox}>
+                      <Text style={styles.fieldLabel}>지연 시간(분)</Text>
+                      <TextInput
+                        style={styles.input}
+                        keyboardType="numeric"
+                        value={ruleDelayMinutes}
+                        onChangeText={setRuleDelayMinutes}
+                      />
+                    </View>
+                  </View>
+                  <View style={styles.repeatInputBox}>
+                    <Text style={styles.fieldLabel}>반복 간격(분)</Text>
+                    <TextInput
+                      style={styles.input}
+                      keyboardType="numeric"
+                      value={ruleRepeatMinutes}
+                      onChangeText={setRuleRepeatMinutes}
+                    />
+                  </View>
+                </View>
+
+                <Text style={styles.fieldLabel}>알림 메시지</Text>
                 <TextInput
                   style={styles.input}
-                  keyboardType="numeric"
-                  value={ruleRepeatMinutes}
-                  onChangeText={setRuleRepeatMinutes}
+                  value={ruleMessage}
+                  onChangeText={setRuleMessage}
+                  placeholder={`${triggerTaskName} 종료 후 체크가 필요한지 확인해주세요.`}
+                  placeholderTextColor="#6b7280"
                 />
-              </View>
-            </View>
 
-            <Text style={styles.fieldLabel}>알림 메시지</Text>
-            <TextInput
-              style={styles.input}
-              value={ruleMessage}
-              onChangeText={setRuleMessage}
-              placeholder={`${triggerTaskName} 종료 후 체크가 필요한지 확인해주세요.`}
-              placeholderTextColor="#6b7280"
-            />
-
-            <Pressable style={styles.button} onPress={handleCreateRule} disabled={savingRule}>
-              <Text style={styles.buttonText}>{savingRule ? '저장 중...' : '알림 규칙 추가'}</Text>
-            </Pressable>
-            {ruleFeedback ? <Text style={styles.formMessage}>{ruleFeedback}</Text> : null}
+                <Pressable style={styles.button} onPress={handleCreateRule} disabled={savingRule}>
+                  <Text style={styles.buttonText}>
+                    {savingRule ? '저장 중...' : '알림 규칙 저장'}
+                  </Text>
+                </Pressable>
+                {ruleFeedback ? <Text style={styles.formMessage}>{ruleFeedback}</Text> : null}
+              </>
+            ) : (
+              <Text style={styles.emptyText}>먼저 테스크 탭에서 루틴을 추가해야 알림 규칙을 만들 수 있습니다.</Text>
+            )}
 
             {rules.length > 0 ? (
               <View style={styles.ruleList}>
@@ -1293,7 +1431,12 @@ export default function App() {
                   return (
                     <View key={rule.id} style={styles.ruleCard}>
                       <View style={styles.taskMeta}>
-                        <Text style={styles.taskCategory}>기준: {trigger}</Text>
+                        <View style={[styles.statusBadge, styles.statusBadgePending]}>
+                          <Text style={[styles.statusBadgeText, styles.statusBadgePendingText]}>
+                            활성 규칙
+                          </Text>
+                        </View>
+                        <Text style={styles.taskCategory}>기준 루틴: {trigger}</Text>
                         <Text style={styles.taskTitle}>{rule.message}</Text>
                         <Text style={styles.taskRepeat}>
                           {formatDelayMinutes(rule.delayMinutes)} 후 시작 /{' '}
@@ -1329,26 +1472,48 @@ const styles = StyleSheet.create({
     gap: 16,
   },
   hero: {
-    paddingTop: 16,
-    gap: 10,
+    paddingTop: 8,
+    gap: 6,
   },
   eyebrow: {
     color: '#f59e0b',
-    fontSize: 13,
+    fontSize: 12,
     fontWeight: '700',
-    letterSpacing: 1,
-    textTransform: 'uppercase',
   },
   title: {
     color: '#f9fafb',
-    fontSize: 32,
+    fontSize: 26,
     fontWeight: '800',
-    lineHeight: 38,
+    lineHeight: 32,
   },
   subtitle: {
     color: '#d1d5db',
-    fontSize: 15,
-    lineHeight: 22,
+    fontSize: 14,
+    lineHeight: 20,
+  },
+  heroStatsRow: {
+    flexDirection: 'row',
+    gap: 10,
+  },
+  heroStatCard: {
+    flex: 1,
+    backgroundColor: '#1f2937',
+    borderRadius: 16,
+    borderWidth: 1,
+    borderColor: '#374151',
+    paddingHorizontal: 12,
+    paddingVertical: 12,
+    gap: 4,
+  },
+  heroStatLabel: {
+    color: '#9ca3af',
+    fontSize: 12,
+    fontWeight: '700',
+  },
+  heroStatValue: {
+    color: '#f9fafb',
+    fontSize: 20,
+    fontWeight: '800',
   },
   tabRow: {
     flexDirection: 'row',
@@ -1497,6 +1662,38 @@ const styles = StyleSheet.create({
   taskRepeat: {
     color: '#9ca3af',
     fontSize: 13,
+  },
+  statusBadge: {
+    alignSelf: 'flex-start',
+    borderRadius: 999,
+    paddingHorizontal: 10,
+    paddingVertical: 5,
+    borderWidth: 1,
+  },
+  statusBadgeText: {
+    fontSize: 12,
+    fontWeight: '800',
+  },
+  statusBadgePending: {
+    backgroundColor: '#172554',
+    borderColor: '#2563eb',
+  },
+  statusBadgePendingText: {
+    color: '#bfdbfe',
+  },
+  statusBadgeInProgress: {
+    backgroundColor: '#451a03',
+    borderColor: '#f59e0b',
+  },
+  statusBadgeInProgressText: {
+    color: '#fde68a',
+  },
+  statusBadgeDone: {
+    backgroundColor: '#052e16',
+    borderColor: '#10b981',
+  },
+  statusBadgeDoneText: {
+    color: '#a7f3d0',
   },
   statusButton: {
     borderRadius: 12,
@@ -1732,6 +1929,12 @@ const styles = StyleSheet.create({
   filterSection: {
     gap: 8,
   },
+  filterSummaryRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    gap: 12,
+  },
   filterBlock: {
     gap: 6,
   },
@@ -1768,6 +1971,19 @@ const styles = StyleSheet.create({
   },
   filterChipTextInactive: {
     color: '#e5e7eb',
+  },
+  filterResetButton: {
+    paddingHorizontal: 10,
+    paddingVertical: 6,
+    borderRadius: 999,
+    borderWidth: 1,
+    borderColor: '#4b5563',
+    backgroundColor: '#111827',
+  },
+  filterResetButtonText: {
+    color: '#e5e7eb',
+    fontSize: 12,
+    fontWeight: '700',
   },
   delayInputGroup: {
     flex: 1,
@@ -1818,6 +2034,15 @@ const styles = StyleSheet.create({
     color: '#d1d5db',
     fontSize: 13,
   },
+  helpToggle: {
+    alignSelf: 'flex-start',
+    paddingVertical: 4,
+  },
+  helpToggleText: {
+    color: '#fbbf24',
+    fontSize: 13,
+    fontWeight: '700',
+  },
   ruleList: {
     gap: 10,
   },
@@ -1828,6 +2053,24 @@ const styles = StyleSheet.create({
     borderColor: '#374151',
     padding: 14,
     gap: 12,
+  },
+  helperCard: {
+    backgroundColor: '#111827',
+    borderRadius: 16,
+    borderWidth: 1,
+    borderColor: '#374151',
+    padding: 14,
+    gap: 6,
+  },
+  helperTitle: {
+    color: '#f9fafb',
+    fontSize: 14,
+    fontWeight: '700',
+  },
+  helperText: {
+    color: '#d1d5db',
+    fontSize: 13,
+    lineHeight: 20,
   },
   modalBackdrop: {
     flex: 1,
