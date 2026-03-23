@@ -41,6 +41,7 @@ export async function initializeDatabase() {
       id TEXT PRIMARY KEY NOT NULL,
       template_id TEXT NOT NULL,
       recurrence_rule_id TEXT NOT NULL,
+      reminder_rule_id TEXT,
       task_date TEXT NOT NULL,
       status TEXT NOT NULL,
       opened_at TEXT,
@@ -78,12 +79,21 @@ export async function initializeDatabase() {
   `);
 
   const taskTicketColumns = await db.getAllAsync<{ name: string }>('PRAGMA table_info(task_tickets)');
-  if (taskTicketColumns.some((column) => column.name === 'dismissed_at')) {
+  const hasDismissedAt = taskTicketColumns.some((column) => column.name === 'dismissed_at');
+  const hasReminderRuleId = taskTicketColumns.some((column) => column.name === 'reminder_rule_id');
+
+  if (hasDismissedAt || !hasReminderRuleId) {
+    const reminderRuleSource = hasReminderRuleId
+      ? 'tt.reminder_rule_id'
+      : `(SELECT rr.id FROM reminder_rules rr WHERE rr.template_id = tt.template_id AND rr.is_active = 1 LIMIT 1)`;
+    const dismissedFilter = hasDismissedAt ? "WHERE tt.dismissed_at IS NULL OR tt.dismissed_at = ''" : '';
+
     await db.execAsync(`
       CREATE TABLE IF NOT EXISTS task_tickets_new (
         id TEXT PRIMARY KEY NOT NULL,
         template_id TEXT NOT NULL,
         recurrence_rule_id TEXT NOT NULL,
+        reminder_rule_id TEXT,
         task_date TEXT NOT NULL,
         status TEXT NOT NULL,
         opened_at TEXT,
@@ -94,12 +104,21 @@ export async function initializeDatabase() {
       );
 
       INSERT INTO task_tickets_new (
-        id, template_id, recurrence_rule_id, task_date, status, opened_at, completed_at, created_at, updated_at
+        id, template_id, recurrence_rule_id, reminder_rule_id, task_date, status, opened_at, completed_at, created_at, updated_at
       )
       SELECT
-        id, template_id, recurrence_rule_id, task_date, status, opened_at, completed_at, created_at, updated_at
-      FROM task_tickets
-      WHERE dismissed_at IS NULL OR dismissed_at = '';
+        tt.id,
+        tt.template_id,
+        tt.recurrence_rule_id,
+        ${reminderRuleSource},
+        tt.task_date,
+        tt.status,
+        tt.opened_at,
+        tt.completed_at,
+        tt.created_at,
+        tt.updated_at
+      FROM task_tickets tt
+      ${dismissedFilter};
 
       DROP TABLE task_tickets;
       ALTER TABLE task_tickets_new RENAME TO task_tickets;

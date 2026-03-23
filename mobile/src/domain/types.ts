@@ -45,6 +45,7 @@ export type TaskTicket = {
   id: string;
   templateId: string;
   recurrenceRuleId: string;
+  reminderRuleId?: string | null;
   taskDate: string;
   status: TaskTicketStatus;
   openedAt?: string | null;

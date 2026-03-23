@@ -29,6 +29,19 @@ export function TaskItemCard({
 }: TaskItemCardProps) {
   // 오늘 목록과 달력 상세가 같은 카드 UI를 쓰도록 공통 렌더링만 담당한다.
   const tone = getTaskStatusTone(item.status);
+  const getButtonTone = (label: string) => {
+    if (label === '완료') {
+      return 'done';
+    }
+
+    if (label === '예정') {
+      return 'pending';
+    }
+
+    return 'inProgress';
+  };
+  const primaryTone = actionLabel ? getButtonTone(actionLabel) : null;
+  const secondaryTone = secondaryActionLabel ? getButtonTone(secondaryActionLabel) : null;
 
   return (
     <View style={styles.taskCard}>
@@ -83,18 +96,52 @@ export function TaskItemCard({
         {secondaryActionLabel && onSecondaryPress && actionLabel && onPress ? (
           <View style={styles.actionRow}>
             <Pressable
-              style={[styles.statusButton, styles.secondaryStatusButton, styles.compactStatusButton]}
+              style={[
+                styles.statusButton,
+                secondaryTone === 'done'
+                  ? styles.doneStatusButton
+                  : secondaryTone === 'pending'
+                    ? styles.pendingStatusButton
+                    : styles.inProgressStatusButton,
+                styles.compactStatusButton,
+              ]}
               onPress={onSecondaryPress}
             >
-              <Text style={[styles.statusButtonText, styles.secondaryStatusButtonText]}>
+              <Text
+                style={[
+                  styles.statusButtonText,
+                  secondaryTone === 'done'
+                    ? styles.doneStatusButtonText
+                    : secondaryTone === 'pending'
+                      ? styles.pendingStatusButtonText
+                      : styles.inProgressStatusButtonText,
+                ]}
+              >
                 {secondaryActionLabel}
               </Text>
             </Pressable>
             <Pressable
-              style={[styles.statusButton, styles.primaryStatusButton, styles.compactStatusButton]}
+              style={[
+                styles.statusButton,
+                primaryTone === 'done'
+                  ? styles.doneStatusButton
+                  : primaryTone === 'pending'
+                    ? styles.pendingStatusButton
+                    : styles.inProgressStatusButton,
+                styles.compactStatusButton,
+              ]}
               onPress={onPress}
             >
-              <Text style={[styles.statusButtonText, styles.primaryStatusButtonText]}>
+              <Text
+                style={[
+                  styles.statusButtonText,
+                  primaryTone === 'done'
+                    ? styles.doneStatusButtonText
+                    : primaryTone === 'pending'
+                      ? styles.pendingStatusButtonText
+                      : styles.inProgressStatusButtonText,
+                ]}
+              >
                 {actionLabel}
               </Text>
             </Pressable>
@@ -103,18 +150,22 @@ export function TaskItemCard({
           <Pressable
             style={[
               styles.statusButton,
-              item.status === 'DONE'
-                ? styles.secondaryStatusButton
-                : styles.primaryStatusButton,
+              primaryTone === 'done'
+                ? styles.doneStatusButton
+                : primaryTone === 'pending'
+                  ? styles.pendingStatusButton
+                  : styles.inProgressStatusButton,
             ]}
             onPress={onPress}
           >
             <Text
               style={[
                 styles.statusButtonText,
-                item.status === 'DONE'
-                  ? styles.secondaryStatusButtonText
-                  : styles.primaryStatusButtonText,
+                primaryTone === 'done'
+                  ? styles.doneStatusButtonText
+                  : primaryTone === 'pending'
+                    ? styles.pendingStatusButtonText
+                    : styles.inProgressStatusButtonText,
               ]}
             >
               {actionLabel}
@@ -225,17 +276,23 @@ const styles = StyleSheet.create({
     paddingHorizontal: 12,
     paddingVertical: 10,
   },
-  primaryStatusButton: {
-    backgroundColor: '#f59e0b',
-  },
-  primaryStatusButtonText: {
-    color: '#111827',
-  },
-  secondaryStatusButton: {
+  pendingStatusButton: {
     backgroundColor: '#374151',
   },
-  secondaryStatusButtonText: {
+  pendingStatusButtonText: {
     color: '#f9fafb',
+  },
+  inProgressStatusButton: {
+    backgroundColor: '#f59e0b',
+  },
+  inProgressStatusButtonText: {
+    color: '#111827',
+  },
+  doneStatusButton: {
+    backgroundColor: '#10b981',
+  },
+  doneStatusButtonText: {
+    color: '#052e16',
   },
   statusButtonText: {
     fontWeight: '700',

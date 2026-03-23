@@ -55,6 +55,7 @@ const taskItemSelectColumns = `
   tt.id AS ticket_id,
   tt.task_date,
   tt.status AS ticket_status,
+  tt.reminder_rule_id,
   tt.opened_at,
   tt.completed_at,
   tt.created_at AS ticket_created_at,
@@ -82,6 +83,7 @@ function mapRowToTicket(row: any): TaskTicket {
     id: row.ticket_id,
     templateId: row.template_id,
     recurrenceRuleId: row.recurrence_rule_id,
+    reminderRuleId: (row.reminder_rule_id as string | null | undefined) ?? null,
     taskDate: row.task_date,
     status: row.ticket_status,
     openedAt: row.opened_at,
@@ -227,11 +229,13 @@ export async function ensureTodayTaskTickets(dateKey: string) {
       SELECT
         t.id AS template_id,
         r.id AS recurrence_rule_id,
+        rr.id AS reminder_rule_id,
         r.repeat_type,
         r.repeat_days,
         r.starts_on
       FROM task_templates t
       INNER JOIN recurrence_rules r ON r.template_id = t.id
+      LEFT JOIN reminder_rules rr ON rr.template_id = t.id AND rr.is_active = 1
       WHERE t.is_active = 1 AND r.is_active = 1
     `
   );
@@ -249,13 +253,14 @@ export async function ensureTodayTaskTickets(dateKey: string) {
     await db.runAsync(
       `
         INSERT OR IGNORE INTO task_tickets (
-          id, template_id, recurrence_rule_id, task_date, status, opened_at, completed_at, created_at, updated_at
-        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+          id, template_id, recurrence_rule_id, reminder_rule_id, task_date, status, opened_at, completed_at, created_at, updated_at
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
       `,
       [
         createId('ticket'),
         row.template_id,
         row.recurrence_rule_id,
+        row.reminder_rule_id ?? null,
         dateKey,
         'PENDING',
         null,
