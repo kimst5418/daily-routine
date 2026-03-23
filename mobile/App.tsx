@@ -33,6 +33,7 @@ import {
   deactivateReminderRulesByTask,
   deactivateReminderRule,
   listReminderRules,
+  updateReminderRule,
 } from './src/data/reminders';
 import type {
   ReminderRule,
@@ -81,11 +82,62 @@ import {
 type AppTab = (typeof tabs)[number]['key'];
 type CalendarViewMode = 'MONTH' | 'WEEK';
 
+function BottomTabIcon({ tab, selected }: { tab: AppTab; selected: boolean }) {
+  const stroke = selected ? '#f59e0b' : '#9ca3af';
+  const fill = selected ? '#f59e0b' : '#374151';
+
+  if (tab === 'today') {
+    return (
+      <View style={styles.iconToday}>
+        <View style={[styles.iconTodayRing, { borderColor: stroke }]} />
+        <View style={[styles.iconTodayDot, { backgroundColor: fill }]} />
+      </View>
+    );
+  }
+
+  if (tab === 'calendar') {
+    return (
+      <View style={[styles.iconCalendar, { borderColor: stroke }]}>
+        <View style={styles.iconCalendarPins}>
+          <View style={[styles.iconCalendarPin, { backgroundColor: stroke }]} />
+          <View style={[styles.iconCalendarPin, { backgroundColor: stroke }]} />
+        </View>
+        <View style={[styles.iconCalendarLine, { backgroundColor: stroke }]} />
+        <View style={styles.iconCalendarGrid}>
+          {[0, 1, 2, 3].map((index) => (
+            <View key={index} style={[styles.iconCalendarCell, { backgroundColor: fill }]} />
+          ))}
+        </View>
+      </View>
+    );
+  }
+
+  if (tab === 'tasks') {
+    return (
+      <View style={styles.iconTasks}>
+        {[0, 1, 2].map((index) => (
+          <View key={index} style={styles.iconTasksRow}>
+            <View style={[styles.iconTasksBullet, { borderColor: stroke }]} />
+            <View style={[styles.iconTasksLine, { backgroundColor: stroke }]} />
+          </View>
+        ))}
+      </View>
+    );
+  }
+
+  return (
+    <View style={styles.iconBell}>
+      <View style={[styles.iconBellBody, { borderColor: stroke }]} />
+      <View style={[styles.iconBellClapper, { backgroundColor: fill }]} />
+      <View style={[styles.iconBellBase, { backgroundColor: stroke }]} />
+    </View>
+  );
+}
+
 export default function App() {
   const scrollViewRef = useRef<ScrollView | null>(null);
   const [activeTab, setActiveTab] = useState<AppTab>('today');
   const [showTaskHelp, setShowTaskHelp] = useState(false);
-  const [showReminderHelp, setShowReminderHelp] = useState(false);
   const [permissionLabel, setPermissionLabel] = useState(
     isExpoGo() ? 'Expo Go에서는 알림이 비활성화됩니다.' : '알림 권한 확인 필요'
   );
@@ -112,7 +164,7 @@ export default function App() {
   const [calendarItemsByDate, setCalendarItemsByDate] = useState<Record<string, TodayTaskItem[]>>({});
   const [tasks, setTasks] = useState<Task[]>([]);
   const [rules, setRules] = useState<ReminderRule[]>([]);
-  const [ruleTriggerTaskId, setRuleTriggerTaskId] = useState('');
+  const [showReminderSettings, setShowReminderSettings] = useState(false);
   const [ruleDelayMinutes, setRuleDelayMinutes] = useState('60');
   const [ruleRepeatMinutes, setRuleRepeatMinutes] = useState('3');
   const [ruleMaxAlertCount, setRuleMaxAlertCount] = useState('5');
@@ -121,7 +173,6 @@ export default function App() {
   const [savingRule, setSavingRule] = useState(false);
 
   const today = toDateKey(new Date());
-  const activeReminderRuleCount = rules.filter((rule) => rule.isActive).length;
   const todayDoneCount = todayItems.filter((item) => item.status === 'DONE').length;
   const todayInProgressCount = todayItems.filter((item) => item.status === 'IN_PROGRESS').length;
   const todayPendingCount = todayItems.filter((item) => item.status === 'PENDING').length;
@@ -144,8 +195,6 @@ export default function App() {
         : `${weekStartDate.getFullYear()}년 ${weekStartDate.getMonth() + 1}/${weekStartDate.getDate()} - ${
             weekEndDate.getFullYear()
           }년 ${weekEndDate.getMonth() + 1}/${weekEndDate.getDate()}`;
-  const triggerTaskName =
-    tasks.find((task) => task.id === ruleTriggerTaskId)?.title ?? '기준 테스크';
   const filteredSelectedItems = filterTaskItems(
     selectedItems,
     calendarStatusFilter,
@@ -177,18 +226,13 @@ export default function App() {
     },
     calendar: {
       eyebrow: '기록 보기',
-      title: '달력',
+      title: '기록',
       subtitle: activeCalendarFilterCount > 0 ? `필터 ${activeCalendarFilterCount}개 적용됨` : '',
     },
     tasks: {
       eyebrow: '루틴 관리',
-      title: '테스크',
+      title: '루틴',
       subtitle: editingTaskId ? '수정 중' : '',
-    },
-    reminders: {
-      eyebrow: '알림 규칙',
-      title: '알림',
-      subtitle: activeReminderRuleCount > 0 ? `${activeReminderRuleCount}개 활성` : '',
     },
   };
 
@@ -198,6 +242,9 @@ export default function App() {
     setCategory('운동');
     setRepeatType('DAILY');
     setRepeatDays([1, 2, 3, 4, 5]);
+    setShowReminderSettings(false);
+    setRuleFeedback('');
+    resetReminderForm();
   }
 
   function resetReminderForm() {
@@ -280,10 +327,6 @@ export default function App() {
         setCalendarItemsByDate(itemsByDate);
         setTasks(allTasks);
         setRules(allRules);
-
-        if (allTasks[0]) {
-          setRuleTriggerTaskId(allTasks[0].id);
-        }
       } catch {
         if (!active) {
           return;
@@ -303,12 +346,12 @@ export default function App() {
   }, []);
 
   useEffect(() => {
-    if (activeTab !== 'reminders' || isExpoGo()) {
+    if (activeTab !== 'tasks' || !showReminderSettings || isExpoGo()) {
       return;
     }
 
     void syncNotificationPermission(true);
-  }, [activeTab]);
+  }, [activeTab, showReminderSettings]);
 
   useEffect(() => {
     let active = true;
@@ -361,10 +404,6 @@ export default function App() {
 
     setTasks(allTasks);
     setRules(allRules);
-
-    if (!allTasks.some((task) => task.id === ruleTriggerTaskId)) {
-      setRuleTriggerTaskId(allTasks[0]?.id ?? '');
-    }
   }
 
   async function syncNotificationPermission(requestIfNeeded: boolean) {
@@ -432,8 +471,11 @@ export default function App() {
 
     setSavingTask(true);
     setFormMessage('');
+    setRuleFeedback('');
 
     try {
+      let savedTaskId = editingTaskId;
+
       if (editingTaskId) {
         await updateTask(editingTaskId, {
           title: normalizedTitle,
@@ -442,40 +484,83 @@ export default function App() {
           repeatDays,
         });
       } else {
-        await createTask({
+        const createdTask = await createTask({
           title: normalizedTitle,
           category,
           repeatType,
           repeatDays,
           startDate: today,
         });
+        savedTaskId = createdTask.id;
+      }
+
+      if (savedTaskId) {
+        await saveTaskWithReminderSettings(savedTaskId);
       }
 
       await refreshTaskViews(selectedDate, visibleMonth);
       await refreshMetadata();
 
-      if (!editingTaskId) {
-        const allTasks = await listActiveTasks();
-        if (!ruleTriggerTaskId && allTasks[0]) {
-          setRuleTriggerTaskId(allTasks[0].id);
-        }
-      }
-
       resetTaskForm();
-      setFormMessage(editingTaskId ? '테스크를 수정했습니다.' : '새 테스크를 추가했습니다.');
-    } catch {
-      setFormMessage(editingTaskId ? '테스크 수정 중 오류가 발생했습니다.' : '테스크 저장 중 오류가 발생했습니다.');
+      setFormMessage(editingTaskId ? '루틴을 수정했습니다.' : '새 루틴을 추가했습니다.');
+    } catch (error) {
+      if (error instanceof Error && error.message === 'ONLY_ONE_REMINDER_RULE_PER_TASK') {
+        setRuleFeedback('루틴당 알림 설정은 1개만 연결할 수 있습니다.');
+      } else if (error instanceof Error && error.message) {
+        setRuleFeedback(error.message);
+      }
+      setFormMessage(editingTaskId ? '루틴 수정 중 오류가 발생했습니다.' : '루틴 저장 중 오류가 발생했습니다.');
     } finally {
       setSavingTask(false);
     }
   }
 
+  function validateReminderSettings() {
+    const delayMinutes = Number(ruleDelayMinutes);
+    const repeatMinutes = Number(ruleRepeatMinutes);
+    const maxAlertCount = Number(ruleMaxAlertCount);
+
+    if (!Number.isFinite(delayMinutes) || delayMinutes < 1) {
+      return { error: '지연 시간은 최소 1분 이상이어야 합니다.' };
+    }
+
+    if (!Number.isFinite(repeatMinutes) || repeatMinutes <= 0 || repeatMinutes > 10) {
+      return { error: '반복 간격은 1분 이상 10분 이하만 설정할 수 있습니다.' };
+    }
+
+    if (!Number.isFinite(maxAlertCount) || maxAlertCount <= 0 || maxAlertCount > 10) {
+      return { error: '최대 알림 횟수는 1회 이상 10회 이하만 설정할 수 있습니다.' };
+    }
+
+    if (!ruleMessage.trim()) {
+      return { error: '알림 메시지를 입력해주세요.' };
+    }
+
+    return {
+      delayMinutes,
+      repeatMinutes,
+      maxAlertCount,
+    };
+  }
+
   function handleEditTask(task: Task) {
+    const linkedRule = rules.find((rule) => rule.templateId === task.id);
     setEditingTaskId(task.id);
     setTitle(task.title);
     setCategory(task.category);
     setRepeatType(task.repeatType);
     setRepeatDays(task.repeatType === 'WEEKLY_DAYS' ? task.repeatDays : [1, 2, 3, 4, 5]);
+    if (linkedRule) {
+      setShowReminderSettings(true);
+      setRuleDelayMinutes(String(linkedRule.delayMinutes));
+      setRuleRepeatMinutes(String(linkedRule.repeatIntervalMinutes ?? 3));
+      setRuleMaxAlertCount(String(linkedRule.maxAlertCount));
+      setRuleMessage(linkedRule.message);
+    } else {
+      setShowReminderSettings(false);
+      resetReminderForm();
+    }
+    setRuleFeedback('');
     setFormMessage('수정할 내용을 바꾼 뒤 저장해주세요.');
     setActiveTab('tasks');
   }
@@ -489,15 +574,11 @@ export default function App() {
     await refreshTaskViews(selectedDate, visibleMonth);
     await refreshMetadata();
 
-    if (ruleTriggerTaskId === task.id) {
-      setRuleTriggerTaskId('');
-    }
-
     if (editingTaskId === task.id) {
       resetTaskForm();
     }
 
-    setFormMessage('테스크를 비활성화했습니다.');
+    setFormMessage('루틴을 비활성화했습니다.');
   }
 
   async function handleDismissTodayTicket(item: TodayTaskItem) {
@@ -521,78 +602,40 @@ export default function App() {
     await refreshTaskViews(dateKey, monthKey);
   }
 
-  async function handleCreateRule() {
-    const delayMinutes = Number(ruleDelayMinutes);
-    const repeatMinutes = Number(ruleRepeatMinutes);
-    const maxAlertCount = Number(ruleMaxAlertCount);
+  async function saveTaskWithReminderSettings(taskId: string) {
+    const existingRule = rules.find((rule) => rule.templateId === taskId);
 
-    if (!ruleTriggerTaskId) {
-      setRuleFeedback('기준 테스크를 선택해주세요.');
+    if (!showReminderSettings) {
+      if (existingRule) {
+        await deleteReminderEventsForTask(taskId);
+        await deactivateReminderRule(existingRule.id);
+      }
       return;
     }
 
-    if (!ruleMessage.trim()) {
-      setRuleFeedback('알림 메시지를 입력해주세요.');
-      return;
+    const validated = validateReminderSettings();
+    if ('error' in validated) {
+      throw new Error(validated.error);
     }
 
-    if (
-      !Number.isFinite(delayMinutes) ||
-      delayMinutes < 1
-    ) {
-      setRuleFeedback('지연 시간은 최소 1분 이상이어야 합니다.');
-      return;
-    }
-
-    if (!Number.isFinite(repeatMinutes) || repeatMinutes <= 0 || repeatMinutes > 10) {
-      setRuleFeedback('반복 간격은 1분 이상 10분 이하만 설정할 수 있습니다.');
-      return;
-    }
-
-    if (!Number.isFinite(maxAlertCount) || maxAlertCount <= 0 || maxAlertCount > 10) {
-      setRuleFeedback('최대 알림 횟수는 1회 이상 10회 이하만 설정할 수 있습니다.');
-      return;
-    }
-
-    if (hasActiveReminderRule(rules, ruleTriggerTaskId)) {
-      setRuleFeedback('테스크당 알림 규칙은 1개만 연결할 수 있습니다.');
-      return;
-    }
-
-    setSavingRule(true);
-    setRuleFeedback('');
-
-    try {
-      await createReminderRule({
-        templateId: ruleTriggerTaskId,
-        delayMinutes,
-        repeatIntervalMinutes: repeatMinutes,
-        maxAlertCount,
+    if (existingRule) {
+      await deleteReminderEventsForTask(taskId);
+      await updateReminderRule(existingRule.id, {
+        delayMinutes: validated.delayMinutes,
+        repeatIntervalMinutes: validated.repeatMinutes,
+        maxAlertCount: validated.maxAlertCount,
         message: ruleMessage,
       });
-
-      const allRules = await listReminderRules();
-      setRules(allRules);
-      resetReminderForm();
-      setRuleFeedback('알림 규칙을 추가했습니다.');
-    } catch (error) {
-      if (error instanceof Error && error.message === 'ONLY_ONE_REMINDER_RULE_PER_TASK') {
-        setRuleFeedback('테스크당 알림 규칙은 1개만 연결할 수 있습니다.');
-      } else {
-        setRuleFeedback('알림 규칙 저장 중 오류가 발생했습니다.');
-      }
-    } finally {
-      setSavingRule(false);
+      return;
     }
-  }
 
-  async function handleDeactivateRule(ruleId: string) {
-    const targetRule = rules.find((rule) => rule.id === ruleId);
-    if (targetRule) {
-      await deleteReminderEventsForTask(targetRule.templateId);
-    }
-    await deactivateReminderRule(ruleId);
-    await refreshMetadata();
+    await createReminderRule({
+      templateId: taskId,
+      delayMinutes: validated.delayMinutes,
+      repeatIntervalMinutes: validated.repeatMinutes,
+      maxAlertCount: validated.maxAlertCount,
+      message: ruleMessage,
+    });
   }
 
   const calendarPanResponder = PanResponder.create({
@@ -635,32 +678,6 @@ export default function App() {
               ))}
             </View>
           ) : null}
-        </View>
-
-        <View style={styles.tabRow}>
-          {tabs.map((tab) => {
-            const selected = activeTab === tab.key;
-
-            return (
-              <Pressable
-                key={tab.key}
-                style={[
-                  styles.tabButton,
-                  selected ? styles.tabButtonActive : styles.tabButtonInactive,
-                ]}
-                onPress={() => setActiveTab(tab.key)}
-              >
-                <Text
-                  style={[
-                    styles.tabButtonText,
-                    selected ? styles.tabButtonTextActive : styles.tabButtonTextInactive,
-                  ]}
-                >
-                  {tab.label}
-                </Text>
-              </Pressable>
-            );
-          })}
         </View>
 
         {activeTab === 'today' ? (
@@ -1118,6 +1135,93 @@ export default function App() {
                 </>
               ) : null}
 
+              <View style={styles.filterSummaryRow}>
+                <Text style={styles.fieldLabel}>알림 설정</Text>
+                <Pressable
+                  style={styles.filterResetButton}
+                  onPress={() => {
+                    setShowReminderSettings((prev) => {
+                      const next = !prev;
+                      if (!next && !editingTaskId) {
+                        resetReminderForm();
+                        setRuleFeedback('');
+                      }
+                      return next;
+                    });
+                  }}
+                >
+                  <Text style={styles.filterResetButtonText}>
+                    {showReminderSettings ? '접기' : '추가'}
+                  </Text>
+                </Pressable>
+              </View>
+
+              {showReminderSettings ? (
+                <>
+                  <View style={styles.helperCard}>
+                    <Text style={styles.helperTitle}>선택 설정</Text>
+                    <Text style={styles.helperText}>
+                      루틴을 시작했을 때만 알림이 동작합니다. 필요할 때만 켜고, 저장 시 루틴과 함께 반영됩니다.
+                    </Text>
+                  </View>
+
+                  <View style={styles.permissionRow}>
+                    <Text style={styles.permissionText}>{permissionLabel}</Text>
+                    {!isExpoGo() ? (
+                      <Pressable style={styles.permissionButton} onPress={handlePermissionPress}>
+                        <Text style={styles.permissionButtonText}>권한 확인</Text>
+                      </Pressable>
+                    ) : null}
+                  </View>
+
+                  <View style={styles.inlineInputs}>
+                    <View style={styles.reminderInputBox}>
+                      <Text style={styles.compactFieldLabel}>지연(분)</Text>
+                      <TextInput
+                        style={styles.input}
+                        keyboardType="numeric"
+                        value={ruleDelayMinutes}
+                        onChangeText={setRuleDelayMinutes}
+                      />
+                    </View>
+                    <View style={styles.reminderInputBox}>
+                      <Text style={styles.compactFieldLabel}>반복(분)</Text>
+                      <TextInput
+                        style={styles.input}
+                        keyboardType="numeric"
+                        value={ruleRepeatMinutes}
+                        onChangeText={setRuleRepeatMinutes}
+                      />
+                    </View>
+                    <View style={styles.reminderInputBox}>
+                      <Text style={styles.compactFieldLabel}>최대 횟수</Text>
+                      <TextInput
+                        style={styles.input}
+                        keyboardType="numeric"
+                        value={ruleMaxAlertCount}
+                        onChangeText={setRuleMaxAlertCount}
+                      />
+                    </View>
+                  </View>
+
+                  <Text style={styles.fieldLabel}>알림 메시지</Text>
+                  <TextInput
+                    style={styles.input}
+                    value={ruleMessage}
+                    onChangeText={setRuleMessage}
+                    placeholder="예: 체크해주세요"
+                    placeholderTextColor="#6b7280"
+                    returnKeyType="done"
+                    onFocus={() => {
+                      requestAnimationFrame(() => {
+                        scrollViewRef.current?.scrollToEnd({ animated: true });
+                      });
+                    }}
+                  />
+                  {ruleFeedback ? <Text style={styles.formMessage}>{ruleFeedback}</Text> : null}
+                </>
+              ) : null}
+
               <View style={styles.inlineActionRow}>
                 <Pressable style={styles.buttonFlex} onPress={handleCreateTask} disabled={savingTask}>
                   <Text style={styles.buttonText}>
@@ -1151,6 +1255,18 @@ export default function App() {
                             ? '매일'
                             : `요일 반복: ${formatRepeatDays(task.repeatDays)}`}
                         </Text>
+                        {(() => {
+                          const linkedRule = rules.find((rule) => rule.templateId === task.id);
+                          if (!linkedRule) {
+                            return null;
+                          }
+
+                          return (
+                            <Text style={styles.taskRepeat}>
+                              알림: {linkedRule.delayMinutes}분 후 / {linkedRule.repeatIntervalMinutes ?? '-'}분 간격 / 최대 {linkedRule.maxAlertCount}회
+                            </Text>
+                          );
+                        })()}
                       </View>
                       <View style={styles.inlineActionRow}>
                         <Pressable
@@ -1174,159 +1290,6 @@ export default function App() {
               )}
             </View>
           </>
-        ) : null}
-
-        {activeTab === 'reminders' ? (
-          <View style={styles.panel}>
-            <Text style={styles.panelTitle}>알림 규칙</Text>
-            <Pressable
-              style={styles.helpToggle}
-              onPress={() => setShowReminderHelp((prev) => !prev)}
-            >
-              <Text style={styles.helpToggleText}>
-                {showReminderHelp ? '설명 숨기기' : '설명 보기'}
-              </Text>
-            </Pressable>
-            {showReminderHelp ? (
-              <View style={styles.helperCard}>
-                <Text style={styles.helperText}>
-                  특정 루틴이 시작된 뒤 지연 시간 기준으로 확인 알림을 보냅니다. 각 루틴에는 활성 규칙을 1개만 연결할 수 있습니다.
-                </Text>
-              </View>
-            ) : null}
-
-            {tasks.length > 0 ? (
-              <>
-                <Text style={styles.fieldLabel}>기준 테스크</Text>
-                <View style={styles.chipRow}>
-                  {tasks.map((task) => (
-                    <Pressable
-                      key={task.id}
-                      style={[
-                        styles.chip,
-                        ruleTriggerTaskId === task.id ? styles.chipActive : styles.chipInactive,
-                      ]}
-                      onPress={() => {
-                        setRuleTriggerTaskId(task.id);
-                        if (!ruleMessage.trim()) {
-                          setRuleMessage(`${task.title} 종료 후 체크가 필요한지 확인해주세요.`);
-                        }
-                      }}
-                    >
-                      <Text
-                        style={[
-                          styles.chipText,
-                          ruleTriggerTaskId === task.id
-                            ? styles.chipTextActive
-                            : styles.chipTextInactive,
-                        ]}
-                      >
-                        {task.title}
-                      </Text>
-                    </Pressable>
-                  ))}
-                </View>
-
-                <View style={styles.helperCard}>
-                  <Text style={styles.helperTitle}>현재 설정 미리보기</Text>
-                  <Text style={styles.helperText}>
-                    {triggerTaskName} 시작 후 {ruleDelayMinutes}분이 지나면 알림이 시작되고,
-                    이후 {ruleRepeatMinutes}분 간격으로 최대 {ruleMaxAlertCount}회까지 반복됩니다.
-                  </Text>
-                </View>
-
-                <View style={styles.permissionRow}>
-                  <Text style={styles.permissionText}>{permissionLabel}</Text>
-                  {!isExpoGo() ? (
-                    <Pressable style={styles.permissionButton} onPress={handlePermissionPress}>
-                      <Text style={styles.permissionButtonText}>권한 확인</Text>
-                    </Pressable>
-                  ) : null}
-                </View>
-
-                <View style={styles.inlineInputs}>
-                  <View style={styles.reminderInputBox}>
-                    <Text style={styles.compactFieldLabel}>지연(분)</Text>
-                    <TextInput
-                      style={styles.input}
-                      keyboardType="numeric"
-                      value={ruleDelayMinutes}
-                      onChangeText={setRuleDelayMinutes}
-                    />
-                  </View>
-                  <View style={styles.reminderInputBox}>
-                    <Text style={styles.compactFieldLabel}>반복(분)</Text>
-                    <TextInput
-                      style={styles.input}
-                      keyboardType="numeric"
-                      value={ruleRepeatMinutes}
-                      onChangeText={setRuleRepeatMinutes}
-                    />
-                  </View>
-                  <View style={styles.reminderInputBox}>
-                    <Text style={styles.compactFieldLabel}>최대 횟수</Text>
-                    <TextInput
-                      style={styles.input}
-                      keyboardType="numeric"
-                      value={ruleMaxAlertCount}
-                      onChangeText={setRuleMaxAlertCount}
-                    />
-                  </View>
-                </View>
-
-                <Text style={styles.fieldLabel}>알림 메시지</Text>
-                <TextInput
-                  style={styles.input}
-                  value={ruleMessage}
-                  onChangeText={setRuleMessage}
-                  placeholder="예: 체크해주세요"
-                  placeholderTextColor="#6b7280"
-                  returnKeyType="done"
-                  onFocus={() => {
-                    requestAnimationFrame(() => {
-                      scrollViewRef.current?.scrollToEnd({ animated: true });
-                    });
-                  }}
-                />
-
-                <Pressable style={styles.button} onPress={handleCreateRule} disabled={savingRule}>
-                  <Text style={styles.buttonText}>
-                    {savingRule ? '저장 중...' : '알림 규칙 저장'}
-                  </Text>
-                </Pressable>
-                {ruleFeedback ? <Text style={styles.formMessage}>{ruleFeedback}</Text> : null}
-              </>
-            ) : (
-              <Text style={styles.emptyText}>먼저 테스크 탭에서 루틴을 추가해야 알림 규칙을 만들 수 있습니다.</Text>
-            )}
-
-            {rules.length > 0 ? (
-              <View style={styles.ruleList}>
-                {rules.map((rule) => {
-                  const trigger = tasks.find((task) => task.id === rule.templateId)?.title ?? '-';
-
-                  return (
-                    <View key={rule.id} style={styles.ruleCard}>
-                      <View style={styles.taskMeta}>
-                        <Text style={styles.taskCategory}>기준 루틴: {trigger}</Text>
-                        <Text style={styles.taskTitle}>{rule.message}</Text>
-                        <Text style={styles.taskRepeat}>
-                          {formatDelayMinutes(rule.delayMinutes)} 후 시작 /{' '}
-                          {rule.repeatIntervalMinutes ?? '-'}분 간격 / 최대 {rule.maxAlertCount}회
-                        </Text>
-                      </View>
-                      <Pressable
-                        style={[styles.statusButton, styles.deleteButton]}
-                        onPress={() => handleDeactivateRule(rule.id)}
-                      >
-                        <Text style={styles.statusButtonText}>비활성화</Text>
-                      </Pressable>
-                    </View>
-                  );
-                })}
-              </View>
-            ) : null}
-          </View>
         ) : null}
 
         <Modal
@@ -1361,6 +1324,32 @@ export default function App() {
           </View>
         </Modal>
       </ScrollView>
+      <View style={styles.tabRow}>
+        {tabs.map((tab) => {
+          const selected = activeTab === tab.key;
+
+          return (
+            <Pressable
+              key={tab.key}
+              style={[
+                styles.tabButton,
+                selected ? styles.tabButtonActive : styles.tabButtonInactive,
+              ]}
+              onPress={() => setActiveTab(tab.key)}
+            >
+              <BottomTabIcon tab={tab.key} selected={selected} />
+              <Text
+                style={[
+                  styles.tabButtonText,
+                  selected ? styles.tabButtonTextActive : styles.tabButtonTextInactive,
+                ]}
+              >
+                {tab.label}
+              </Text>
+            </Pressable>
+          );
+        })}
+      </View>
       </KeyboardAvoidingView>
     </SafeAreaView>
   );
@@ -1374,6 +1363,7 @@ const styles = StyleSheet.create({
   content: {
     padding: 20,
     gap: 16,
+    paddingBottom: 110,
   },
   hero: {
     paddingTop: 8,
@@ -1421,34 +1411,144 @@ const styles = StyleSheet.create({
   },
   tabRow: {
     flexDirection: 'row',
-    flexWrap: 'wrap',
-    gap: 8,
+    gap: 10,
+    paddingHorizontal: 16,
+    paddingTop: 12,
+    paddingBottom: 16,
+    borderTopWidth: 1,
+    borderTopColor: '#253043',
+    backgroundColor: '#111827',
   },
   tabButton: {
-    flexGrow: 1,
-    borderRadius: 999,
-    borderWidth: 1,
-    paddingHorizontal: 14,
+    flex: 1,
+    borderRadius: 18,
+    paddingHorizontal: 8,
     paddingVertical: 10,
     alignItems: 'center',
+    gap: 6,
   },
   tabButtonActive: {
-    backgroundColor: '#f59e0b',
-    borderColor: '#f59e0b',
+    backgroundColor: '#1f2937',
   },
   tabButtonInactive: {
-    backgroundColor: '#111827',
-    borderColor: '#374151',
+    backgroundColor: 'transparent',
   },
   tabButtonText: {
-    fontSize: 14,
+    fontSize: 12,
     fontWeight: '800',
   },
   tabButtonTextActive: {
-    color: '#111827',
+    color: '#f9fafb',
   },
   tabButtonTextInactive: {
-    color: '#e5e7eb',
+    color: '#9ca3af',
+  },
+  iconToday: {
+    width: 22,
+    height: 22,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  iconTodayRing: {
+    width: 18,
+    height: 18,
+    borderRadius: 9,
+    borderWidth: 2,
+  },
+  iconTodayDot: {
+    position: 'absolute',
+    width: 6,
+    height: 6,
+    borderRadius: 3,
+  },
+  iconCalendar: {
+    width: 22,
+    height: 20,
+    borderRadius: 6,
+    borderWidth: 2,
+    paddingTop: 3,
+    alignItems: 'center',
+  },
+  iconCalendarPins: {
+    position: 'absolute',
+    top: -3,
+    width: 14,
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+  },
+  iconCalendarPin: {
+    width: 3,
+    height: 5,
+    borderRadius: 2,
+  },
+  iconCalendarLine: {
+    width: 12,
+    height: 2,
+    borderRadius: 999,
+    marginTop: 2,
+    marginBottom: 3,
+  },
+  iconCalendarGrid: {
+    width: 12,
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 2,
+    justifyContent: 'center',
+  },
+  iconCalendarCell: {
+    width: 4,
+    height: 4,
+    borderRadius: 1,
+  },
+  iconTasks: {
+    width: 22,
+    height: 20,
+    justifyContent: 'space-between',
+    paddingVertical: 1,
+  },
+  iconTasksRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+  },
+  iconTasksBullet: {
+    width: 5,
+    height: 5,
+    borderRadius: 2.5,
+    borderWidth: 1.5,
+  },
+  iconTasksLine: {
+    flex: 1,
+    height: 2,
+    borderRadius: 999,
+  },
+  iconBell: {
+    width: 22,
+    height: 22,
+    alignItems: 'center',
+    justifyContent: 'flex-end',
+  },
+  iconBellBody: {
+    width: 16,
+    height: 14,
+    borderWidth: 2,
+    borderTopLeftRadius: 8,
+    borderTopRightRadius: 8,
+    borderBottomLeftRadius: 6,
+    borderBottomRightRadius: 6,
+  },
+  iconBellClapper: {
+    position: 'absolute',
+    bottom: 4,
+    width: 4,
+    height: 4,
+    borderRadius: 2,
+  },
+  iconBellBase: {
+    width: 10,
+    height: 2,
+    borderRadius: 999,
+    marginTop: 2,
   },
   panel: {
     backgroundColor: '#1f2937',

@@ -17,9 +17,8 @@ export const weekdays = [
 
 export const tabs = [
   { key: 'today', label: '오늘' },
-  { key: 'calendar', label: '달력' },
-  { key: 'tasks', label: '테스크' },
-  { key: 'reminders', label: '알림' },
+  { key: 'calendar', label: '기록' },
+  { key: 'tasks', label: '루틴' },
 ] as const;
 
 export type CalendarStatusFilter = 'ALL' | 'DONE' | 'PENDING' | 'IN_PROGRESS';

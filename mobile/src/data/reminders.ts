@@ -10,6 +10,13 @@ type CreateReminderRuleInput = {
   maxAlertCount: number;
 };
 
+type UpdateReminderRuleInput = {
+  delayMinutes: number;
+  message: string;
+  repeatIntervalMinutes?: number | null;
+  maxAlertCount: number;
+};
+
 function mapRowToReminderRule(row: any): ReminderRule {
   return {
     id: row.id,
@@ -87,6 +94,29 @@ export async function createReminderRule(input: CreateReminderRuleInput) {
   );
 
   return rule;
+}
+
+export async function updateReminderRule(ruleId: string, input: UpdateReminderRuleInput) {
+  const db = await getDatabase();
+  const updatedAt = new Date().toISOString();
+  const repeatIntervalMinutes = Math.min(10, Math.max(1, input.repeatIntervalMinutes ?? 1));
+  const maxAlertCount = Math.min(10, Math.max(1, input.maxAlertCount));
+
+  await db.runAsync(
+    `
+      UPDATE reminder_rules
+      SET delay_minutes = ?, message = ?, repeat_interval_minutes = ?, max_alert_count = ?, updated_at = ?
+      WHERE id = ? AND is_active = 1
+    `,
+    [
+      input.delayMinutes,
+      input.message.trim(),
+      repeatIntervalMinutes,
+      maxAlertCount,
+      updatedAt,
+      ruleId,
+    ]
+  );
 }
 
 export async function deactivateReminderRule(ruleId: string) {
