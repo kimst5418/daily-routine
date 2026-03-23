@@ -175,7 +175,7 @@ export default function App() {
   const [todayItems, setTodayItems] = useState<TodayTaskItem[]>([]);
   const [loadingTasks, setLoadingTasks] = useState(true);
   const [title, setTitle] = useState('');
-  const [category, setCategory] = useState<TaskCategory>('운동');
+  const [category, setCategory] = useState<TaskCategory>('기타');
   const [repeatType, setRepeatType] = useState<TaskRepeatType>('DAILY');
   const [repeatDays, setRepeatDays] = useState<number[]>([1, 2, 3, 4, 5]);
   const [editingTaskId, setEditingTaskId] = useState<string | null>(null);
@@ -255,7 +255,7 @@ export default function App() {
   function resetTaskForm() {
     setEditingTaskId(null);
     setTitle('');
-    setCategory('운동');
+    setCategory('기타');
     setRepeatType('DAILY');
     setRepeatDays([1, 2, 3, 4, 5]);
     setShowReminderSettings(false);
