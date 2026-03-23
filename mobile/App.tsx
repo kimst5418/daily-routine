@@ -1310,18 +1310,12 @@ export default function App() {
                   return (
                     <View key={rule.id} style={styles.ruleCard}>
                       <View style={styles.taskMeta}>
-                        <View style={[styles.statusBadge, styles.statusBadgePending]}>
-                          <Text style={[styles.statusBadgeText, styles.statusBadgePendingText]}>
-                            활성 규칙
-                          </Text>
-                        </View>
                         <Text style={styles.taskCategory}>기준 루틴: {trigger}</Text>
                         <Text style={styles.taskTitle}>{rule.message}</Text>
                         <Text style={styles.taskRepeat}>
                           {formatDelayMinutes(rule.delayMinutes)} 후 시작 /{' '}
                           {rule.repeatIntervalMinutes ?? '-'}분 간격 / 최대 {rule.maxAlertCount}회
                         </Text>
-                        <Text style={styles.taskRepeat}>종료 조건: 수동 해제</Text>
                       </View>
                       <Pressable
                         style={[styles.statusButton, styles.deleteButton]}
