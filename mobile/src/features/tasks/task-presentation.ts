@@ -90,14 +90,14 @@ export function getTaskStatusTone(status: TaskTicketStatus): TaskStatusTone {
 
 export function getStatusActionLabel(item: TodayTaskItem, hasReminderRule: boolean) {
   if (item.status === 'DONE') {
-    return '완료 취소';
+    return '예정';
   }
 
   if (item.status === 'IN_PROGRESS') {
-    return '진행 중단';
+    return '완료';
   }
 
-  return hasReminderRule ? '시작하기' : '완료 처리';
+  return hasReminderRule ? '시작' : '완료';
 }
 
 export function getNextTaskStatus(
@@ -107,6 +107,10 @@ export function getNextTaskStatus(
   // 알림 규칙이 있으면 시작 시 IN_PROGRESS 로 진입하고, 없으면 바로 DONE 처리한다.
   if (currentStatus === 'PENDING') {
     return hasLinkedRules ? 'IN_PROGRESS' : 'DONE';
+  }
+
+  if (currentStatus === 'IN_PROGRESS') {
+    return 'DONE';
   }
 
   return 'PENDING';

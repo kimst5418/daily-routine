@@ -47,7 +47,6 @@ export type TaskTicket = {
   recurrenceRuleId: string;
   taskDate: string;
   status: TaskTicketStatus;
-  dismissedAt?: string | null;
   openedAt?: string | null;
   completedAt?: string | null;
   createdAt: string;

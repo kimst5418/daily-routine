@@ -19,7 +19,7 @@ import { initializeDatabase } from './src/data/database';
 import {
   createTask,
   deactivateTask,
-  dismissTaskTicket,
+  deleteTaskTicket,
   ensureTodayTaskTickets,
   getTaskItemsForDate,
   getTaskItemsForDates,
@@ -53,8 +53,8 @@ import {
 } from './src/lib/date';
 import { TaskItemCard } from './src/components/TaskItemCard';
 import {
-  expireReminderEventsForTask,
-  expireReminderEventsForTaskTicket,
+  deleteReminderEventsForTask,
+  deleteReminderEventsForTaskTicket,
   handleReminderEventsAfterTaskStatusChange,
   rescheduleDueReminderEvents,
 } from './src/features/reminders/reminder-workflow';
@@ -398,11 +398,12 @@ export default function App() {
     ticketId: string,
     templateId: string,
     currentStatus: TodayTaskItem['status'],
-    dateKey: string
+    dateKey: string,
+    explicitNextStatus?: TodayTaskItem['status']
   ) {
     // 버튼 클릭 한 번으로 상태 변경과 알림 후속 처리를 함께 맞춘다.
     const hasLinkedRules = hasActiveReminderRule(rules, templateId);
-    const nextStatus = getNextTaskStatus(currentStatus, hasLinkedRules);
+    const nextStatus = explicitNextStatus ?? getNextTaskStatus(currentStatus, hasLinkedRules);
     const ticket = await setTaskStatus(ticketId, nextStatus);
     await handleReminderEventsAfterTaskStatusChange({
       ticketId,
@@ -487,7 +488,7 @@ export default function App() {
   async function handleDeactivateTask(task: Task) {
     setFormMessage('');
 
-    await expireReminderEventsForTask(task.id);
+    await deleteReminderEventsForTask(task.id);
     await deactivateReminderRulesByTask(task.id);
     await deactivateTask(task.id);
     await refreshTaskViews(selectedDate, visibleMonth);
@@ -505,8 +506,8 @@ export default function App() {
   }
 
   async function handleDismissTodayTicket(item: TodayTaskItem) {
-    await expireReminderEventsForTaskTicket(item.ticket.id);
-    await dismissTaskTicket(item.ticket.id);
+    await deleteReminderEventsForTaskTicket(item.ticket.id);
+    await deleteTaskTicket(item.ticket.id);
     await refreshTaskViews(today, visibleMonth);
   }
 
@@ -680,10 +681,33 @@ export default function App() {
                     item,
                     hasActiveReminderRule(rules, item.task.id)
                   )}
+                  secondaryActionLabel={item.status === 'IN_PROGRESS' ? '예정' : null}
+                  onSecondaryPress={
+                    item.status === 'IN_PROGRESS'
+                      ? () =>
+                          handleStatusPress(
+                            item.ticket.id,
+                            item.task.id,
+                            item.status,
+                            today,
+                            'PENDING'
+                          )
+                      : undefined
+                  }
                   checkedAtLabel={item.status === 'DONE' ? formatOptionalTime(item.checkedAt) : null}
                   onDeletePress={() => setPendingDismissItem(item)}
-                  onPress={() =>
-                    handleStatusPress(item.ticket.id, item.task.id, item.status, today)
+                  onPress={
+                    item.status === 'IN_PROGRESS'
+                      ? () =>
+                          handleStatusPress(
+                            item.ticket.id,
+                            item.task.id,
+                            item.status,
+                            today,
+                            'DONE'
+                          )
+                      : () =>
+                            handleStatusPress(item.ticket.id, item.task.id, item.status, today)
                   }
                 />
               ))
@@ -915,9 +939,37 @@ export default function App() {
                     item,
                     hasActiveReminderRule(rules, item.task.id)
                   )}
+                  secondaryActionLabel={item.status === 'IN_PROGRESS' ? '예정' : null}
+                  onSecondaryPress={
+                    item.status === 'IN_PROGRESS'
+                      ? () =>
+                          handleStatusPress(
+                            item.ticket.id,
+                            item.task.id,
+                            item.status,
+                            selectedDate,
+                            'PENDING'
+                          )
+                      : undefined
+                  }
                   checkedAtLabel={item.status === 'DONE' ? formatOptionalTime(item.checkedAt) : null}
-                  onPress={() =>
-                    handleStatusPress(item.ticket.id, item.task.id, item.status, selectedDate)
+                  onPress={
+                    item.status === 'IN_PROGRESS'
+                      ? () =>
+                          handleStatusPress(
+                            item.ticket.id,
+                            item.task.id,
+                            item.status,
+                            selectedDate,
+                            'DONE'
+                          )
+                      : () =>
+                            handleStatusPress(
+                              item.ticket.id,
+                              item.task.id,
+                              item.status,
+                              selectedDate
+                            )
                   }
                 />
               ))}
@@ -1293,10 +1345,10 @@ export default function App() {
         >
           <View style={styles.modalBackdrop}>
             <View style={styles.confirmModalCard}>
-              <Text style={styles.panelTitle}>오늘 테스크 숨기기</Text>
+              <Text style={styles.panelTitle}>오늘 테스크 삭제</Text>
               <Text style={styles.helperText}>
                 {pendingDismissItem
-                  ? `"${pendingDismissItem.task.title}"를 오늘 목록에서 숨길까요? 템플릿은 유지됩니다.`
+                  ? `"${pendingDismissItem.task.title}"를 오늘 목록에서 삭제할까요? 오늘 티켓만 삭제되고 템플릿은 유지됩니다.`
                   : ''}
               </Text>
               <View style={styles.inlineActionRow}>
@@ -1310,7 +1362,7 @@ export default function App() {
                   style={[styles.buttonFlex, styles.modalActionButton]}
                   onPress={() => void confirmDismissTodayTicket()}
                 >
-                  <Text style={styles.buttonText}>숨기기</Text>
+                  <Text style={styles.buttonText}>삭제</Text>
                 </Pressable>
               </View>
             </View>

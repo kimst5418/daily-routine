@@ -48,7 +48,6 @@ async function ensureDefaultChannel() {
     importance: Notifications.AndroidImportance.MAX,
     vibrationPattern: [0, 250, 250, 250],
     lightColor: '#f59e0b',
-    sound: 'default',
   });
 
   channelInitialized = true;

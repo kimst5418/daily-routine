@@ -43,6 +43,7 @@ erDiagram
         integer delay_minutes
         text message
         integer repeat_interval_minutes
+        integer max_alert_count
         integer is_active
         text created_at
         text updated_at
@@ -75,4 +76,5 @@ erDiagram
 - `recurrence_rules`는 반복 규칙입니다.
 - `task_tickets`는 날짜별 실제 수행 티켓입니다.
 - `reminder_rules`는 템플릿당 최대 1개의 활성 알림 규칙을 가집니다.
+- `reminder_rules`는 지연 시간, 반복 간격, 최대 알림 횟수를 가집니다.
 - `reminder_events`는 티켓 실행 이후 생성되는 알림 이벤트입니다.

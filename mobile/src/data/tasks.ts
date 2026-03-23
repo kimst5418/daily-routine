@@ -55,7 +55,6 @@ const taskItemSelectColumns = `
   tt.id AS ticket_id,
   tt.task_date,
   tt.status AS ticket_status,
-  tt.dismissed_at,
   tt.opened_at,
   tt.completed_at,
   tt.created_at AS ticket_created_at,
@@ -85,7 +84,6 @@ function mapRowToTicket(row: any): TaskTicket {
     recurrenceRuleId: row.recurrence_rule_id,
     taskDate: row.task_date,
     status: row.ticket_status,
-    dismissedAt: row.dismissed_at,
     openedAt: row.opened_at,
     completedAt: row.completed_at,
     createdAt: row.ticket_created_at,
@@ -294,7 +292,7 @@ export async function getTaskItemsForDate(dateKey: string): Promise<TodayTaskIte
       INNER JOIN task_templates t ON t.id = tt.template_id
       INNER JOIN recurrence_rules r ON r.id = tt.recurrence_rule_id
       LEFT JOIN reminder_events re ON re.task_ticket_id = tt.id
-      WHERE tt.task_date = ? AND tt.dismissed_at IS NULL
+      WHERE tt.task_date = ?
       GROUP BY tt.id
       ORDER BY tt.status ASC, t.title ASC
     `,
@@ -321,7 +319,7 @@ export async function getTaskItemsForDates(dateKeys: string[]) {
       FROM task_tickets tt
       INNER JOIN task_templates t ON t.id = tt.template_id
       INNER JOIN recurrence_rules r ON r.id = tt.recurrence_rule_id
-      WHERE tt.task_date >= ? AND tt.task_date <= ? AND tt.dismissed_at IS NULL
+      WHERE tt.task_date >= ? AND tt.task_date <= ?
       ORDER BY tt.task_date ASC, tt.status ASC, t.title ASC
     `,
     [startDate, endDate]
@@ -355,7 +353,7 @@ export async function getMonthCompletionSummaries(
     `
       SELECT task_date, status
       FROM task_tickets
-      WHERE task_date >= ? AND task_date <= ? AND dismissed_at IS NULL
+      WHERE task_date >= ? AND task_date <= ?
       ORDER BY task_date ASC
     `,
     [monthStart, monthEnd]
@@ -416,17 +414,12 @@ export async function setTaskStatus(ticketId: string, status: TaskTicketStatus) 
   };
 }
 
-export async function dismissTaskTicket(ticketId: string) {
+export async function deleteTaskTicket(ticketId: string) {
   const db = await getDatabase();
-  const now = new Date().toISOString();
 
   await db.runAsync(
-    `
-      UPDATE task_tickets
-      SET dismissed_at = ?, updated_at = ?
-      WHERE id = ?
-    `,
-    [now, now, ticketId]
+    'DELETE FROM task_tickets WHERE id = ?',
+    [ticketId]
   );
 }
 

@@ -43,7 +43,6 @@ export async function initializeDatabase() {
       recurrence_rule_id TEXT NOT NULL,
       task_date TEXT NOT NULL,
       status TEXT NOT NULL,
-      dismissed_at TEXT,
       opened_at TEXT,
       completed_at TEXT,
       created_at TEXT NOT NULL,
@@ -79,10 +78,31 @@ export async function initializeDatabase() {
   `);
 
   const taskTicketColumns = await db.getAllAsync<{ name: string }>('PRAGMA table_info(task_tickets)');
-  if (!taskTicketColumns.some((column) => column.name === 'dismissed_at')) {
+  if (taskTicketColumns.some((column) => column.name === 'dismissed_at')) {
     await db.execAsync(`
-      ALTER TABLE task_tickets
-      ADD COLUMN dismissed_at TEXT;
+      CREATE TABLE IF NOT EXISTS task_tickets_new (
+        id TEXT PRIMARY KEY NOT NULL,
+        template_id TEXT NOT NULL,
+        recurrence_rule_id TEXT NOT NULL,
+        task_date TEXT NOT NULL,
+        status TEXT NOT NULL,
+        opened_at TEXT,
+        completed_at TEXT,
+        created_at TEXT NOT NULL,
+        updated_at TEXT NOT NULL,
+        UNIQUE(recurrence_rule_id, task_date)
+      );
+
+      INSERT INTO task_tickets_new (
+        id, template_id, recurrence_rule_id, task_date, status, opened_at, completed_at, created_at, updated_at
+      )
+      SELECT
+        id, template_id, recurrence_rule_id, task_date, status, opened_at, completed_at, created_at, updated_at
+      FROM task_tickets
+      WHERE dismissed_at IS NULL OR dismissed_at = '';
+
+      DROP TABLE task_tickets;
+      ALTER TABLE task_tickets_new RENAME TO task_tickets;
     `);
   }
 

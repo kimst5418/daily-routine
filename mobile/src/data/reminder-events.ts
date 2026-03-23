@@ -124,6 +124,35 @@ export async function dismissReminderEvent(eventId: string) {
   };
 }
 
+export async function completePendingReminderEventsByTaskTicket(ticketId: string) {
+  const db = await getDatabase();
+  const completedAt = new Date().toISOString();
+  const rows = await db.getAllAsync<any>(
+    `
+      SELECT *
+      FROM reminder_events
+      WHERE task_ticket_id = ? AND status = 'PENDING'
+      ORDER BY scheduled_at DESC
+    `,
+    [ticketId]
+  );
+
+  if (rows.length === 0) {
+    return [];
+  }
+
+  const events = rows.map(mapRowToReminderEvent);
+  const eventIds = events.map((event) => event.id);
+  const placeholders = eventIds.map(() => '?').join(', ');
+
+  await db.runAsync(
+    `UPDATE reminder_events SET status = 'COMPLETED', completed_at = ?, notification_request_id = NULL WHERE id IN (${placeholders})`,
+    [completedAt, ...eventIds]
+  );
+
+  return events;
+}
+
 export async function completeReminderEventCycle(input: {
   eventId: string;
   sentAt: string;
@@ -161,7 +190,7 @@ export async function completeReminderEventCycle(input: {
   );
 }
 
-export async function cancelPendingReminderEventsByRelatedTask(taskId: string) {
+export async function deletePendingReminderEventsByRelatedTask(taskId: string) {
   const db = await getDatabase();
   const rows = await db.getAllAsync<any>(
     `
@@ -183,14 +212,14 @@ export async function cancelPendingReminderEventsByRelatedTask(taskId: string) {
   const placeholders = eventIds.map(() => '?').join(', ');
 
   await db.runAsync(
-    `UPDATE reminder_events SET status = 'EXPIRED' WHERE id IN (${placeholders})`,
+    `DELETE FROM reminder_events WHERE id IN (${placeholders})`,
     eventIds
   );
 
   return events;
 }
 
-export async function cancelPendingReminderEventsByTaskTicket(ticketId: string) {
+export async function deletePendingReminderEventsByTaskTicket(ticketId: string) {
   const db = await getDatabase();
   const rows = await db.getAllAsync<any>(
     `
@@ -211,7 +240,7 @@ export async function cancelPendingReminderEventsByTaskTicket(ticketId: string) 
   const placeholders = eventIds.map(() => '?').join(', ');
 
   await db.runAsync(
-    `UPDATE reminder_events SET status = 'EXPIRED' WHERE id IN (${placeholders})`,
+    `DELETE FROM reminder_events WHERE id IN (${placeholders})`,
     eventIds
   );
 

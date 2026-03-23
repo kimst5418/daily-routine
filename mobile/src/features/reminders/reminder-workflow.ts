@@ -1,6 +1,7 @@
 import {
-  cancelPendingReminderEventsByRelatedTask,
-  cancelPendingReminderEventsByTaskTicket,
+  completePendingReminderEventsByTaskTicket,
+  deletePendingReminderEventsByRelatedTask,
+  deletePendingReminderEventsByTaskTicket,
   completeReminderEventCycle,
   createReminderEvent,
   listDueReminderEvents,
@@ -31,17 +32,23 @@ export async function cancelScheduledNotificationsForEvents(
   );
 }
 
-export async function expireReminderEventsForTaskTicket(ticketId: string) {
-  // 상태가 바뀌면 기존 pending 알림은 더 이상 유효하지 않으므로 함께 정리한다.
-  const canceledEvents = await cancelPendingReminderEventsByTaskTicket(ticketId);
-  await cancelScheduledNotificationsForEvents(canceledEvents);
-  return canceledEvents;
+export async function deleteReminderEventsForTaskTicket(ticketId: string) {
+  // 상태가 바뀌면 기존 pending 알림은 더 이상 유효하지 않으므로 함께 삭제한다.
+  const deletedEvents = await deletePendingReminderEventsByTaskTicket(ticketId);
+  await cancelScheduledNotificationsForEvents(deletedEvents);
+  return deletedEvents;
 }
 
-export async function expireReminderEventsForTask(taskId: string) {
-  const canceledEvents = await cancelPendingReminderEventsByRelatedTask(taskId);
-  await cancelScheduledNotificationsForEvents(canceledEvents);
-  return canceledEvents;
+export async function completeReminderEventsForTaskTicket(ticketId: string) {
+  const completedEvents = await completePendingReminderEventsByTaskTicket(ticketId);
+  await cancelScheduledNotificationsForEvents(completedEvents);
+  return completedEvents;
+}
+
+export async function deleteReminderEventsForTask(taskId: string) {
+  const deletedEvents = await deletePendingReminderEventsByRelatedTask(taskId);
+  await cancelScheduledNotificationsForEvents(deletedEvents);
+  return deletedEvents;
 }
 
 export async function scheduleReminderEventsForTaskStart(input: {
@@ -88,8 +95,10 @@ export async function handleReminderEventsAfterTaskStatusChange(input: {
   );
   const nextStatus = input.nextStatus ?? getNextTaskStatus(input.currentStatus, hasLinkedRules);
 
-  if (input.currentStatus === 'IN_PROGRESS' || input.currentStatus === 'DONE') {
-    await expireReminderEventsForTaskTicket(input.ticketId);
+  if (input.currentStatus === 'IN_PROGRESS' && nextStatus === 'DONE') {
+    await completeReminderEventsForTaskTicket(input.ticketId);
+  } else if (input.currentStatus === 'IN_PROGRESS' || input.currentStatus === 'DONE') {
+    await deleteReminderEventsForTaskTicket(input.ticketId);
   }
 
   if (nextStatus === 'IN_PROGRESS' && input.ticket?.openedAt) {

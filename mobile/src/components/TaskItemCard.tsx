@@ -8,8 +8,10 @@ import {
 
 type TaskItemCardProps = {
   item: TodayTaskItem;
-  actionLabel: string;
-  onPress: () => void;
+  actionLabel?: string | null;
+  onPress?: () => void;
+  secondaryActionLabel?: string | null;
+  onSecondaryPress?: () => void;
   onDeletePress?: () => void;
   checkedAtLabel?: string | null;
   reminderEndAtLabel?: string | null;
@@ -19,6 +21,8 @@ export function TaskItemCard({
   item,
   actionLabel,
   onPress,
+  secondaryActionLabel,
+  onSecondaryPress,
   onDeletePress,
   checkedAtLabel,
   reminderEndAtLabel,
@@ -76,19 +80,47 @@ export function TaskItemCard({
         ) : null}
       </View>
       <View style={styles.actionColumn}>
-        <Pressable
-          style={[
-            styles.statusButton,
-            item.status === 'DONE'
-              ? styles.statusDone
-              : item.status === 'IN_PROGRESS'
-                ? styles.statusInProgress
-                : styles.statusPending,
-          ]}
-          onPress={onPress}
-        >
-          <Text style={styles.statusButtonText}>{actionLabel}</Text>
-        </Pressable>
+        {secondaryActionLabel && onSecondaryPress && actionLabel && onPress ? (
+          <View style={styles.actionRow}>
+            <Pressable
+              style={[styles.statusButton, styles.secondaryStatusButton, styles.compactStatusButton]}
+              onPress={onSecondaryPress}
+            >
+              <Text style={[styles.statusButtonText, styles.secondaryStatusButtonText]}>
+                {secondaryActionLabel}
+              </Text>
+            </Pressable>
+            <Pressable
+              style={[styles.statusButton, styles.primaryStatusButton, styles.compactStatusButton]}
+              onPress={onPress}
+            >
+              <Text style={[styles.statusButtonText, styles.primaryStatusButtonText]}>
+                {actionLabel}
+              </Text>
+            </Pressable>
+          </View>
+        ) : actionLabel && onPress ? (
+          <Pressable
+            style={[
+              styles.statusButton,
+              item.status === 'DONE'
+                ? styles.secondaryStatusButton
+                : styles.primaryStatusButton,
+            ]}
+            onPress={onPress}
+          >
+            <Text
+              style={[
+                styles.statusButtonText,
+                item.status === 'DONE'
+                  ? styles.secondaryStatusButtonText
+                  : styles.primaryStatusButtonText,
+              ]}
+            >
+              {actionLabel}
+            </Text>
+          </Pressable>
+        ) : null}
       </View>
     </View>
   );
@@ -151,22 +183,22 @@ const styles = StyleSheet.create({
     fontWeight: '700',
   },
   statusBadgePending: {
-    backgroundColor: '#1f2937',
+    backgroundColor: '#374151',
   },
   statusBadgePendingText: {
-    color: '#fbbf24',
+    color: '#f9fafb',
   },
   statusBadgeInProgress: {
-    backgroundColor: '#153e75',
+    backgroundColor: '#f59e0b',
   },
   statusBadgeInProgressText: {
-    color: '#bfdbfe',
+    color: '#111827',
   },
   statusBadgeDone: {
-    backgroundColor: '#14532d',
+    backgroundColor: '#10b981',
   },
   statusBadgeDoneText: {
-    color: '#bbf7d0',
+    color: '#052e16',
   },
   statusButton: {
     minWidth: 100,
@@ -177,6 +209,10 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     alignSelf: 'center',
   },
+  actionRow: {
+    flexDirection: 'row',
+    gap: 8,
+  },
   actionColumn: {
     gap: 8,
     alignItems: 'center',
@@ -184,17 +220,24 @@ const styles = StyleSheet.create({
     alignSelf: 'stretch',
     paddingRight: 12,
   },
-  statusPending: {
+  compactStatusButton: {
+    minWidth: 72,
+    paddingHorizontal: 12,
+    paddingVertical: 10,
+  },
+  primaryStatusButton: {
     backgroundColor: '#f59e0b',
   },
-  statusInProgress: {
-    backgroundColor: '#2563eb',
+  primaryStatusButtonText: {
+    color: '#111827',
   },
-  statusDone: {
-    backgroundColor: '#10b981',
+  secondaryStatusButton: {
+    backgroundColor: '#374151',
+  },
+  secondaryStatusButtonText: {
+    color: '#f9fafb',
   },
   statusButtonText: {
-    color: '#ffffff',
     fontWeight: '700',
   },
   deleteIconButton: {
