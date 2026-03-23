@@ -134,6 +134,42 @@ function BottomTabIcon({ tab, selected }: { tab: AppTab; selected: boolean }) {
   );
 }
 
+function getCalendarCompletionTone(completionRate: number) {
+  if (completionRate <= 0) {
+    return null;
+  }
+
+  if (completionRate < 0.3) {
+    return {
+      backgroundColor: '#4a3312',
+      borderColor: '#a16207',
+      dayColor: '#fef3c7',
+    };
+  }
+
+  if (completionRate < 0.7) {
+    return {
+      backgroundColor: '#365314',
+      borderColor: '#4d7c0f',
+      dayColor: '#ecfccb',
+    };
+  }
+
+  if (completionRate < 1) {
+    return {
+      backgroundColor: '#14532d',
+      borderColor: '#15803d',
+      dayColor: '#dcfce7',
+    };
+  }
+
+  return {
+    backgroundColor: '#166534',
+    borderColor: '#16a34a',
+    dayColor: '#f0fdf4',
+  };
+}
+
 export default function App() {
   const scrollViewRef = useRef<ScrollView | null>(null);
   const [activeTab, setActiveTab] = useState<AppTab>('today');
@@ -892,8 +928,8 @@ export default function App() {
                   const selected = dateKey === selectedDate;
                   const isToday = dateKey === today;
                   const doneCount = dayItems.filter((item) => item.status === 'DONE').length;
-                  const rate = dayItems.length > 0 ? `${doneCount}/${dayItems.length}` : '-';
                   const completionRate = dayItems.length > 0 ? doneCount / dayItems.length : 0;
+                  const completionTone = getCalendarCompletionTone(completionRate);
 
                   return (
                     <Pressable
@@ -903,6 +939,7 @@ export default function App() {
                         calendarViewMode === 'MONTH' && styles.calendarCellMonth,
                         calendarViewMode === 'WEEK' && styles.calendarCellWeek,
                         calendarViewMode === 'MONTH' && !inCurrentMonth && styles.calendarCellMuted,
+                        completionTone,
                         selected && styles.calendarCellSelected,
                         isToday && styles.calendarTodayCell,
                       ]}
@@ -912,31 +949,12 @@ export default function App() {
                         style={[
                           styles.calendarDay,
                           calendarViewMode === 'MONTH' && !inCurrentMonth && styles.calendarTextMuted,
-                          selected && styles.calendarTextSelected,
+                          completionTone && !selected && { color: completionTone.dayColor },
                           isToday && styles.calendarToday,
                         ]}
                       >
                         {dateKey.slice(-2)}
                       </Text>
-                      <Text
-                        style={[
-                          styles.calendarRate,
-                          dayItems.length > 0 && styles.calendarRateActive,
-                          !inCurrentMonth && styles.calendarTextMuted,
-                          selected && styles.calendarTextSelected,
-                        ]}
-                      >
-                        {rate}
-                      </Text>
-                      <View style={styles.calendarProgressTrack}>
-                        <View
-                          style={[
-                            styles.calendarProgressFill,
-                            { width: `${completionRate * 100}%` },
-                            selected && styles.calendarProgressFillSelected,
-                          ]}
-                        />
-                      </View>
                     </Pressable>
                   );
                 })}
@@ -1862,48 +1880,23 @@ const styles = StyleSheet.create({
     opacity: 0.45,
   },
   calendarCellSelected: {
-    backgroundColor: '#f59e0b',
-    borderColor: '#f59e0b',
+    borderColor: '#d97706',
+    borderWidth: 2,
   },
   calendarTodayCell: {
-    borderColor: '#f59e0b',
+    borderColor: '#fbbf24',
+    borderWidth: 2,
   },
   calendarDay: {
     color: '#f9fafb',
     fontSize: 14,
     fontWeight: '800',
   },
-  calendarRate: {
-    color: '#d1d5db',
-    fontSize: 14,
-    fontWeight: '800',
-  },
-  calendarRateActive: {
-    color: '#f9fafb',
-  },
   calendarTextMuted: {
     color: '#6b7280',
   },
-  calendarTextSelected: {
-    color: '#111827',
-  },
   calendarToday: {
     textDecorationLine: 'underline',
-  },
-  calendarProgressTrack: {
-    width: '100%',
-    height: 6,
-    borderRadius: 999,
-    backgroundColor: '#253043',
-    overflow: 'hidden',
-  },
-  calendarProgressFill: {
-    height: '100%',
-    borderRadius: 999,
-    backgroundColor: '#f59e0b',
-  },
-  calendarProgressFillSelected: {
-    backgroundColor: '#111827',
   },
   input: {
     backgroundColor: '#111827',
