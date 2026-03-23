@@ -1,6 +1,6 @@
 {
   "expo": {
-    "name": "매일한칸",
+    "name": "루틴 한칸",
     "slug": "mobile",
     "version": "1.0.0",
     "orientation": "portrait",
@@ -12,7 +12,8 @@
       "backgroundColor": "#ffffff"
     },
     "ios": {
-      "supportsTablet": true
+      "supportsTablet": true,
+      "bundleIdentifier": "com.kim.secretary"
     },
     "android": {
       "package": "com.kim.secretary",
