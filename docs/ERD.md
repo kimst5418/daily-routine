@@ -55,13 +55,9 @@ erDiagram
         text rule_id FK
         text task_ticket_id FK
         text scheduled_at
-        text sent_at
-        text status
         integer repeat_interval_minutes
         integer max_alert_count
-        integer sent_count
-        text completed_at
-        text notification_request_id
+        text notification_request_ids
     }
 
     task_templates ||--o{ recurrence_rules : "has"
@@ -79,4 +75,5 @@ erDiagram
 - `task_tickets.reminder_rule_id`는 티켓 생성 시점의 알림 규칙 연결 정보를 스냅샷으로 가집니다.
 - `reminder_rules`는 템플릿당 최대 1개의 활성 알림 규칙을 가집니다.
 - `reminder_rules`는 지연 시간, 반복 간격, 최대 알림 횟수를 가집니다.
-- `reminder_events`는 티켓 실행 이후 생성되는 알림 이벤트입니다.
+- `reminder_events`는 현재 살아 있는 예약 알림 묶음만 저장합니다.
+- `reminder_events.notification_request_ids`는 OS 예약 ID 목록을 JSON 배열 문자열로 저장합니다.

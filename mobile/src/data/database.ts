@@ -68,13 +68,9 @@ export async function initializeDatabase() {
       rule_id TEXT NOT NULL,
       task_ticket_id TEXT NOT NULL,
       scheduled_at TEXT NOT NULL,
-      sent_at TEXT,
-      status TEXT NOT NULL,
       repeat_interval_minutes INTEGER,
       max_alert_count INTEGER,
-      sent_count INTEGER NOT NULL DEFAULT 0,
-      completed_at TEXT,
-      notification_request_id TEXT
+      notification_request_ids TEXT NOT NULL DEFAULT '[]'
     );
   `);
 
@@ -138,16 +134,53 @@ export async function initializeDatabase() {
   const reminderEventColumns = await db.getAllAsync<{ name: string }>(
     'PRAGMA table_info(reminder_events)'
   );
-  if (!reminderEventColumns.some((column) => column.name === 'max_alert_count')) {
+  const hasNotificationRequestIds = reminderEventColumns.some(
+    (column) => column.name === 'notification_request_ids'
+  );
+  const hasLegacyReminderEventColumns =
+    reminderEventColumns.some((column) => column.name === 'status') ||
+    reminderEventColumns.some((column) => column.name === 'sent_at') ||
+    reminderEventColumns.some((column) => column.name === 'sent_count') ||
+    reminderEventColumns.some((column) => column.name === 'completed_at') ||
+    reminderEventColumns.some((column) => column.name === 'notification_request_id');
+
+  if (!hasNotificationRequestIds || hasLegacyReminderEventColumns) {
+    const requestIdsSource = hasNotificationRequestIds
+      ? 're.notification_request_ids'
+      : `CASE
+          WHEN re.notification_request_id IS NULL OR re.notification_request_id = '' THEN '[]'
+          ELSE json_array(re.notification_request_id)
+        END`;
+    const maxAlertCountSource = reminderEventColumns.some((column) => column.name === 'max_alert_count')
+      ? 're.max_alert_count'
+      : 'NULL';
+
     await db.execAsync(`
-      ALTER TABLE reminder_events
-      ADD COLUMN max_alert_count INTEGER;
-    `);
-  }
-  if (!reminderEventColumns.some((column) => column.name === 'sent_count')) {
-    await db.execAsync(`
-      ALTER TABLE reminder_events
-      ADD COLUMN sent_count INTEGER NOT NULL DEFAULT 0;
+      CREATE TABLE IF NOT EXISTS reminder_events_new (
+        id TEXT PRIMARY KEY NOT NULL,
+        rule_id TEXT NOT NULL,
+        task_ticket_id TEXT NOT NULL,
+        scheduled_at TEXT NOT NULL,
+        repeat_interval_minutes INTEGER,
+        max_alert_count INTEGER,
+        notification_request_ids TEXT NOT NULL DEFAULT '[]'
+      );
+
+      INSERT INTO reminder_events_new (
+        id, rule_id, task_ticket_id, scheduled_at, repeat_interval_minutes, max_alert_count, notification_request_ids
+      )
+      SELECT
+        re.id,
+        re.rule_id,
+        re.task_ticket_id,
+        re.scheduled_at,
+        re.repeat_interval_minutes,
+        ${maxAlertCountSource},
+        ${requestIdsSource}
+      FROM reminder_events re;
+
+      DROP TABLE reminder_events;
+      ALTER TABLE reminder_events_new RENAME TO reminder_events;
     `);
   }
 

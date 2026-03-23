@@ -36,6 +36,8 @@ export async function listReminderRules() {
 export async function createReminderRule(input: CreateReminderRuleInput) {
   const db = await getDatabase();
   const now = new Date().toISOString();
+  const repeatIntervalMinutes = Math.min(10, Math.max(1, input.repeatIntervalMinutes ?? 1));
+  const maxAlertCount = Math.min(10, Math.max(1, input.maxAlertCount));
   const existing = await db.getFirstAsync<any>(
     'SELECT id FROM reminder_rules WHERE template_id = ? AND is_active = 1',
     [input.templateId]
@@ -50,8 +52,8 @@ export async function createReminderRule(input: CreateReminderRuleInput) {
     templateId: input.templateId,
     delayMinutes: input.delayMinutes,
     message: input.message.trim(),
-    repeatIntervalMinutes: input.repeatIntervalMinutes ?? null,
-    maxAlertCount: input.maxAlertCount,
+    repeatIntervalMinutes,
+    maxAlertCount,
     isActive: true,
     createdAt: now,
     updatedAt: now,

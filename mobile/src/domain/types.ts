@@ -4,8 +4,6 @@ export type TaskCategory = '운동' | '공부' | '생활' | '기타';
 
 export type TaskTicketStatus = 'PENDING' | 'IN_PROGRESS' | 'DONE';
 
-export type ReminderEventStatus = 'PENDING' | 'COMPLETED' | 'EXPIRED';
-
 export type TaskTemplate = {
   id: string;
   title: string;
@@ -71,11 +69,7 @@ export type ReminderEvent = {
   ruleId: string;
   taskTicketId: string;
   scheduledAt: string;
-  sentAt?: string | null;
-  status: ReminderEventStatus;
   repeatIntervalMinutes?: number | null;
   maxAlertCount?: number | null;
-  sentCount: number;
-  completedAt?: string | null;
-  notificationRequestId?: string | null;
+  notificationRequestIds: string[];
 };

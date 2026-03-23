@@ -8,7 +8,7 @@ type CreateReminderEventInput = {
   scheduledAt: string;
   repeatIntervalMinutes?: number | null;
   maxAlertCount?: number | null;
-  notificationRequestId?: string | null;
+  notificationRequestIds?: string[];
 };
 
 function mapRowToReminderEvent(row: any): ReminderEvent {
@@ -17,13 +17,9 @@ function mapRowToReminderEvent(row: any): ReminderEvent {
     ruleId: row.rule_id,
     taskTicketId: row.task_ticket_id,
     scheduledAt: row.scheduled_at,
-    sentAt: row.sent_at,
-    status: row.status,
     repeatIntervalMinutes: row.repeat_interval_minutes,
     maxAlertCount: row.max_alert_count,
-    sentCount: row.sent_count ?? 0,
-    completedAt: row.completed_at,
-    notificationRequestId: row.notification_request_id,
+    notificationRequestIds: JSON.parse((row.notification_request_ids as string | null) ?? '[]'),
   };
 }
 
@@ -36,21 +32,6 @@ export async function listReminderEvents() {
   return rows.map(mapRowToReminderEvent);
 }
 
-export async function listDueReminderEvents(nowIso: string) {
-  const db = await getDatabase();
-  const rows = await db.getAllAsync<any>(
-    `
-      SELECT *
-      FROM reminder_events
-      WHERE status = 'PENDING' AND scheduled_at <= ?
-      ORDER BY scheduled_at ASC
-    `,
-    [nowIso]
-  );
-
-  return rows.map(mapRowToReminderEvent);
-}
-
 export async function createReminderEvent(input: CreateReminderEventInput) {
   const db = await getDatabase();
   const event: ReminderEvent = {
@@ -58,13 +39,9 @@ export async function createReminderEvent(input: CreateReminderEventInput) {
     ruleId: input.ruleId,
     taskTicketId: input.taskTicketId,
     scheduledAt: input.scheduledAt,
-    sentAt: null,
-    status: 'PENDING',
     repeatIntervalMinutes: input.repeatIntervalMinutes ?? null,
     maxAlertCount: input.maxAlertCount ?? null,
-    sentCount: 0,
-    completedAt: null,
-    notificationRequestId: input.notificationRequestId ?? null,
+    notificationRequestIds: input.notificationRequestIds ?? [],
   };
 
   await db.runAsync(
@@ -74,130 +51,33 @@ export async function createReminderEvent(input: CreateReminderEventInput) {
         rule_id,
         task_ticket_id,
         scheduled_at,
-        sent_at,
-        status,
         repeat_interval_minutes,
         max_alert_count,
-        sent_count,
-        completed_at,
-        notification_request_id
-      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        notification_request_ids
+      ) VALUES (?, ?, ?, ?, ?, ?, ?)
     `,
     [
       event.id,
       event.ruleId,
       event.taskTicketId,
       event.scheduledAt,
-      event.sentAt ?? null,
-      event.status,
       event.repeatIntervalMinutes ?? null,
       event.maxAlertCount ?? null,
-      event.sentCount,
-      event.completedAt ?? null,
-      event.notificationRequestId ?? null,
+      JSON.stringify(event.notificationRequestIds),
     ]
   );
 
   return event;
 }
 
-export async function dismissReminderEvent(eventId: string) {
-  const db = await getDatabase();
-  const completedAt = new Date().toISOString();
-  const existing = await db.getFirstAsync<any>(
-    'SELECT task_ticket_id FROM reminder_events WHERE id = ?',
-    [eventId]
-  );
-
-  await db.runAsync(
-    `
-      UPDATE reminder_events
-      SET status = 'COMPLETED', completed_at = ?
-      WHERE id = ? AND status = 'PENDING'
-    `,
-    [completedAt, eventId]
-  );
-
-  return {
-    taskTicketId: (existing?.task_ticket_id as string | undefined) ?? null,
-    completedAt,
-  };
-}
-
-export async function completePendingReminderEventsByTaskTicket(ticketId: string) {
-  const db = await getDatabase();
-  const completedAt = new Date().toISOString();
-  const rows = await db.getAllAsync<any>(
-    `
-      SELECT *
-      FROM reminder_events
-      WHERE task_ticket_id = ? AND status = 'PENDING'
-      ORDER BY scheduled_at DESC
-    `,
-    [ticketId]
-  );
-
-  if (rows.length === 0) {
-    return [];
-  }
-
-  const events = rows.map(mapRowToReminderEvent);
-  const eventIds = events.map((event) => event.id);
-  const placeholders = eventIds.map(() => '?').join(', ');
-
-  await db.runAsync(
-    `UPDATE reminder_events SET status = 'COMPLETED', completed_at = ?, notification_request_id = NULL WHERE id IN (${placeholders})`,
-    [completedAt, ...eventIds]
-  );
-
-  return events;
-}
-
-export async function completeReminderEventCycle(input: {
-  eventId: string;
-  sentAt: string;
-  sentCount: number;
-  nextScheduledAt?: string | null;
-  notificationRequestId?: string | null;
-}) {
-  const db = await getDatabase();
-
-  if (input.nextScheduledAt) {
-    await db.runAsync(
-      `
-        UPDATE reminder_events
-        SET sent_at = ?, sent_count = ?, scheduled_at = ?, notification_request_id = ?, status = 'PENDING'
-        WHERE id = ? AND status = 'PENDING'
-      `,
-      [
-        input.sentAt,
-        input.sentCount,
-        input.nextScheduledAt,
-        input.notificationRequestId ?? null,
-        input.eventId,
-      ]
-    );
-    return;
-  }
-
-  await db.runAsync(
-    `
-      UPDATE reminder_events
-      SET sent_at = ?, sent_count = ?, notification_request_id = NULL, status = 'EXPIRED'
-      WHERE id = ? AND status = 'PENDING'
-    `,
-    [input.sentAt, input.sentCount, input.eventId]
-  );
-}
-
-export async function deletePendingReminderEventsByRelatedTask(taskId: string) {
+export async function deleteReminderEventsByRelatedTask(taskId: string) {
   const db = await getDatabase();
   const rows = await db.getAllAsync<any>(
     `
       SELECT e.*
       FROM reminder_events e
       INNER JOIN reminder_rules r ON r.id = e.rule_id
-      WHERE r.template_id = ? AND e.status = 'PENDING'
+      WHERE r.template_id = ?
       ORDER BY e.scheduled_at DESC
     `,
     [taskId]
@@ -219,13 +99,13 @@ export async function deletePendingReminderEventsByRelatedTask(taskId: string) {
   return events;
 }
 
-export async function deletePendingReminderEventsByTaskTicket(ticketId: string) {
+export async function deleteReminderEventsByTaskTicket(ticketId: string) {
   const db = await getDatabase();
   const rows = await db.getAllAsync<any>(
     `
       SELECT *
       FROM reminder_events
-      WHERE task_ticket_id = ? AND status = 'PENDING'
+      WHERE task_ticket_id = ?
       ORDER BY scheduled_at DESC
     `,
     [ticketId]

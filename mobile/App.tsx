@@ -56,7 +56,6 @@ import {
   deleteReminderEventsForTask,
   deleteReminderEventsForTaskTicket,
   handleReminderEventsAfterTaskStatusChange,
-  rescheduleDueReminderEvents,
 } from './src/features/reminders/reminder-workflow';
 import {
   ensureNotificationPermissions,
@@ -82,7 +81,6 @@ type AppTab = (typeof tabs)[number]['key'];
 type CalendarViewMode = 'MONTH' | 'WEEK';
 
 export default function App() {
-  const reminderEngineRunningRef = useRef(false);
   const scrollViewRef = useRef<ScrollView | null>(null);
   const [activeTab, setActiveTab] = useState<AppTab>('today');
   const [showTaskHelp, setShowTaskHelp] = useState(false);
@@ -262,7 +260,6 @@ export default function App() {
       try {
         await initializeDatabase();
         await ensureTodayTaskTickets(today);
-        await runReminderRescheduleEngine();
 
         const [items, itemsByDate] = await Promise.all([
           getTaskItemsForDate(today),
@@ -301,16 +298,6 @@ export default function App() {
 
     return () => {
       active = false;
-    };
-  }, []);
-
-  useEffect(() => {
-    const intervalId = setInterval(() => {
-      void runReminderEngineSafely();
-    }, 30000);
-
-    return () => {
-      clearInterval(intervalId);
     };
   }, []);
 
@@ -374,24 +361,6 @@ export default function App() {
 
   async function handlePermissionPress() {
     await syncNotificationPermission(true);
-  }
-
-  async function runReminderRescheduleEngine() {
-    if (reminderEngineRunningRef.current) {
-      return;
-    }
-
-    reminderEngineRunningRef.current = true;
-
-    try {
-      await rescheduleDueReminderEvents();
-    } finally {
-      reminderEngineRunningRef.current = false;
-    }
-  }
-
-  async function runReminderEngineSafely() {
-    await runReminderRescheduleEngine();
   }
 
   async function handleStatusPress(
@@ -549,13 +518,13 @@ export default function App() {
       return;
     }
 
-    if (!Number.isFinite(repeatMinutes) || repeatMinutes <= 0) {
-      setRuleFeedback('반복 간격은 1분 이상이어야 합니다.');
+    if (!Number.isFinite(repeatMinutes) || repeatMinutes <= 0 || repeatMinutes > 10) {
+      setRuleFeedback('반복 간격은 1분 이상 10분 이하만 설정할 수 있습니다.');
       return;
     }
 
-    if (!Number.isFinite(maxAlertCount) || maxAlertCount <= 0) {
-      setRuleFeedback('최대 알림 횟수는 1회 이상이어야 합니다.');
+    if (!Number.isFinite(maxAlertCount) || maxAlertCount <= 0 || maxAlertCount > 10) {
+      setRuleFeedback('최대 알림 횟수는 1회 이상 10회 이하만 설정할 수 있습니다.');
       return;
     }
 
@@ -592,9 +561,12 @@ export default function App() {
   }
 
   async function handleDeactivateRule(ruleId: string) {
+    const targetRule = rules.find((rule) => rule.id === ruleId);
+    if (targetRule) {
+      await deleteReminderEventsForTask(targetRule.templateId);
+    }
     await deactivateReminderRule(ruleId);
     await refreshMetadata();
-    await runReminderEngineSafely();
   }
 
   const calendarPanResponder = PanResponder.create({
