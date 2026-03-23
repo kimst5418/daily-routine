@@ -1,5 +1,6 @@
 import { StatusBar } from 'expo-status-bar';
 import { useEffect, useRef, useState } from 'react';
+import Svg, { Path } from 'react-native-svg';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import {
   ActivityIndicator,
@@ -97,17 +98,13 @@ function BottomTabIcon({ tab, selected }: { tab: AppTab; selected: boolean }) {
 
   if (tab === 'calendar') {
     return (
-      <View style={[styles.iconCalendar, { borderColor: stroke }]}>
-        <View style={styles.iconCalendarPins}>
-          <View style={[styles.iconCalendarPin, { backgroundColor: stroke }]} />
-          <View style={[styles.iconCalendarPin, { backgroundColor: stroke }]} />
-        </View>
-        <View style={[styles.iconCalendarLine, { backgroundColor: stroke }]} />
-        <View style={styles.iconCalendarGrid}>
-          {[0, 1, 2, 3].map((index) => (
-            <View key={index} style={[styles.iconCalendarCell, { backgroundColor: fill }]} />
-          ))}
-        </View>
+      <View style={styles.iconCalendarSvgWrap}>
+        <Svg width={20} height={20} viewBox="0 -960 960 960">
+          <Path
+            d="M200-80q-33 0-56.5-23.5T120-160v-560q0-33 23.5-56.5T200-800h40v-80h80v80h320v-80h80v80h40q33 0 56.5 23.5T840-720v560q0 33-23.5 56.5T760-80H200Zm0-80h560v-400H200v400Zm0-480h560v-80H200v80Zm0 0v-80 80Zm280 240q-17 0-28.5-11.5T440-440q0-17 11.5-28.5T480-480q17 0 28.5 11.5T520-440q0 17-11.5 28.5T480-400Zm-188.5-11.5Q280-423 280-440t11.5-28.5Q303-480 320-480t28.5 11.5Q360-457 360-440t-11.5 28.5Q337-400 320-400t-28.5-11.5ZM640-400q-17 0-28.5-11.5T600-440q0-17 11.5-28.5T640-480q17 0 28.5 11.5T680-440q0 17-11.5 28.5T640-400ZM480-240q-17 0-28.5-11.5T440-280q0-17 11.5-28.5T480-320q17 0 28.5 11.5T520-280q0 17-11.5 28.5T480-240Zm-188.5-11.5Q280-263 280-280t11.5-28.5Q303-320 320-320t28.5 11.5Q360-297 360-280t-11.5 28.5Q337-240 320-240t-28.5-11.5ZM640-240q-17 0-28.5-11.5T600-280q0-17 11.5-28.5T640-320q17 0 28.5 11.5T680-280q0 17-11.5 28.5T640-240Z"
+            fill={selected ? '#f59e0b' : '#9ca3af'}
+          />
+        </Svg>
       </View>
     );
   }
@@ -244,29 +241,29 @@ export default function App() {
       eyebrow: string;
       title: string;
       subtitle: string;
-      stats?: Array<{ label: string; value: string }>;
+      stats?: Array<{ label: string; value: string; tone?: 'pending' | 'inProgress' | 'done' }>;
     }
   > = {
     today: {
-      eyebrow: '오늘 집중',
-      title: '오늘 루틴',
+      eyebrow: '',
+      title: '오늘',
       subtitle:
         todayItems.length > 0
           ? `${todayDoneCount}개 완료, ${todayInProgressCount}개 진행 중`
           : '오늘 표시할 루틴이 없습니다.',
       stats: [
-        { label: '완료', value: `${todayDoneCount}` },
-        { label: '진행중', value: `${todayInProgressCount}` },
-        { label: '예정', value: `${todayPendingCount}` },
+        { label: '예정', value: `${todayPendingCount}`, tone: 'pending' },
+        { label: '진행중', value: `${todayInProgressCount}`, tone: 'inProgress' },
+        { label: '완료', value: `${todayDoneCount}`, tone: 'done' },
       ],
     },
     calendar: {
-      eyebrow: '기록 보기',
+      eyebrow: '',
       title: '기록',
-      subtitle: activeCalendarFilterCount > 0 ? `필터 ${activeCalendarFilterCount}개 적용됨` : '',
+      subtitle: '',
     },
     tasks: {
-      eyebrow: '루틴 관리',
+      eyebrow: '',
       title: '루틴',
       subtitle: editingTaskId ? '수정 중' : '',
     },
@@ -699,17 +696,64 @@ export default function App() {
         keyboardShouldPersistTaps="handled"
       >
         <View style={styles.hero}>
-          <Text style={styles.eyebrow}>{heroContent[activeTab].eyebrow}</Text>
-          <Text style={styles.title}>{heroContent[activeTab].title}</Text>
+          <View style={styles.heroBar}>
+            <View style={styles.heroBarTitleRow}>
+              <View style={styles.heroBarIconWrap}>
+                <BottomTabIcon tab={activeTab} selected />
+              </View>
+              <Text style={styles.heroBarTitle}>{heroContent[activeTab].title}</Text>
+            </View>
+            {heroContent[activeTab].eyebrow ? (
+              <Text style={styles.eyebrow}>{heroContent[activeTab].eyebrow}</Text>
+            ) : null}
+          </View>
           {heroContent[activeTab].subtitle ? (
             <Text style={styles.subtitle}>{heroContent[activeTab].subtitle}</Text>
           ) : null}
           {activeTab === 'today' && heroContent.today.stats ? (
             <View style={styles.heroStatsRow}>
               {heroContent.today.stats.map((stat) => (
-                <View key={stat.label} style={styles.heroStatCard}>
-                  <Text style={styles.heroStatLabel}>{stat.label}</Text>
-                  <Text style={styles.heroStatValue}>{stat.value}</Text>
+                <View
+                  key={stat.label}
+                  style={[
+                    styles.heroStatCard,
+                    stat.tone === 'pending'
+                      ? styles.heroStatCardPending
+                      : stat.tone === 'inProgress'
+                        ? styles.heroStatCardInProgress
+                        : stat.tone === 'done'
+                          ? styles.heroStatCardDone
+                          : null,
+                  ]}
+                >
+                  <Text
+                    style={[
+                      styles.heroStatLabel,
+                      stat.tone === 'pending'
+                        ? styles.heroStatLabelPending
+                        : stat.tone === 'inProgress'
+                          ? styles.heroStatLabelInProgress
+                          : stat.tone === 'done'
+                            ? styles.heroStatLabelDone
+                            : null,
+                    ]}
+                  >
+                    {stat.label}
+                  </Text>
+                  <Text
+                    style={[
+                      styles.heroStatValue,
+                      stat.tone === 'pending'
+                        ? styles.heroStatValuePending
+                        : stat.tone === 'inProgress'
+                          ? styles.heroStatValueInProgress
+                          : stat.tone === 'done'
+                            ? styles.heroStatValueDone
+                            : null,
+                    ]}
+                  >
+                    {stat.value}
+                  </Text>
                 </View>
               ))}
             </View>
@@ -718,7 +762,6 @@ export default function App() {
 
         {activeTab === 'today' ? (
           <View style={styles.panel}>
-            <Text style={styles.panelTitle}>오늘의 테스크</Text>
             <Text style={styles.caption}>{`${today} (${getWeekdayLabel(today)})`}</Text>
             {loadingTasks ? (
               <ActivityIndicator color="#f59e0b" />
@@ -962,7 +1005,6 @@ export default function App() {
             </View>
 
             <View style={styles.panel}>
-              <Text style={styles.panelTitle}>선택 날짜 상세</Text>
               <Text style={styles.caption}>{`${selectedDate} · ${filteredSelectedItems.length}개`}</Text>
               {filteredSelectedItems.map((item) => (
                 <TaskItemCard
@@ -1057,9 +1099,12 @@ export default function App() {
         {activeTab === 'tasks' ? (
           <>
             <View style={styles.panel}>
-              <Text style={styles.panelTitle}>
-                {editingTaskId ? '테스크 수정' : '새 테스크 추가'}
-              </Text>
+              <View style={styles.sectionHeadingRow}>
+                <Text style={styles.sectionEyebrow}>
+                  {editingTaskId ? '루틴 수정' : '새 루틴'}
+                </Text>
+                {editingTaskId ? <Text style={styles.sectionMeta}>기존 내용 반영</Text> : null}
+              </View>
               <Pressable style={styles.helpToggle} onPress={() => setShowTaskHelp((prev) => !prev)}>
                 <Text style={styles.helpToggleText}>
                   {showTaskHelp ? '입력 도움말 숨기기' : '입력 도움말 보기'}
@@ -1256,7 +1301,10 @@ export default function App() {
             </View>
 
             <View style={styles.panel}>
-              <Text style={styles.panelTitle}>활성 테스크</Text>
+              <View style={styles.sectionHeadingRow}>
+                <Text style={styles.sectionEyebrow}>활성 루틴</Text>
+                <Text style={styles.sectionMeta}>{tasks.length}개</Text>
+              </View>
               {tasks.length > 0 ? (
                 <View style={styles.ruleList}>
                   {tasks.map((task) => (
@@ -1376,66 +1424,125 @@ export default function App() {
 const styles = StyleSheet.create({
   screen: {
     flex: 1,
-    backgroundColor: '#111827',
+    backgroundColor: '#0b1220',
   },
   content: {
-    padding: 20,
-    gap: 16,
-    paddingBottom: 110,
+    paddingHorizontal: 14,
+    paddingTop: 10,
+    gap: 22,
+    paddingBottom: 118,
   },
   hero: {
-    paddingTop: 8,
-    gap: 6,
+    marginHorizontal: -14,
+    paddingHorizontal: 18,
+    paddingTop: 14,
+    paddingBottom: 16,
+    gap: 10,
+    backgroundColor: '#111827',
+    borderBottomWidth: 1,
+    borderBottomColor: '#1f2937',
+  },
+  heroBar: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    gap: 12,
+  },
+  heroBarTitleRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 10,
+  },
+  heroBarIconWrap: {
+    width: 30,
+    height: 30,
+    borderRadius: 10,
+    backgroundColor: '#182131',
+    borderWidth: 1,
+    borderColor: '#293548',
+    alignItems: 'center',
+    justifyContent: 'center',
   },
   eyebrow: {
-    color: '#f59e0b',
-    fontSize: 12,
+    color: '#94a3b8',
+    fontSize: 11,
     fontWeight: '700',
   },
-  title: {
+  heroBarTitle: {
     color: '#f9fafb',
-    fontSize: 26,
+    fontSize: 18,
     fontWeight: '800',
-    lineHeight: 32,
+    lineHeight: 22,
   },
   subtitle: {
     color: '#d1d5db',
-    fontSize: 14,
-    lineHeight: 20,
+    fontSize: 13,
+    lineHeight: 18,
   },
   heroStatsRow: {
     flexDirection: 'row',
     gap: 10,
+    marginTop: 6,
   },
   heroStatCard: {
     flex: 1,
-    backgroundColor: '#1f2937',
-    borderRadius: 16,
+    backgroundColor: '#182131',
+    borderRadius: 18,
     borderWidth: 1,
-    borderColor: '#374151',
-    paddingHorizontal: 12,
-    paddingVertical: 12,
+    borderColor: '#293548',
+    paddingHorizontal: 14,
+    paddingVertical: 14,
     gap: 4,
+  },
+  heroStatCardPending: {
+    backgroundColor: '#182538',
+    borderColor: '#334155',
+  },
+  heroStatCardInProgress: {
+    backgroundColor: '#2b1d0f',
+    borderColor: '#92400e',
+  },
+  heroStatCardDone: {
+    backgroundColor: '#11261f',
+    borderColor: '#166534',
   },
   heroStatLabel: {
     color: '#9ca3af',
     fontSize: 12,
     fontWeight: '700',
   },
+  heroStatLabelPending: {
+    color: '#cbd5e1',
+  },
+  heroStatLabelInProgress: {
+    color: '#fcd34d',
+  },
+  heroStatLabelDone: {
+    color: '#86efac',
+  },
   heroStatValue: {
     color: '#f9fafb',
     fontSize: 20,
     fontWeight: '800',
   },
+  heroStatValuePending: {
+    color: '#f8fafc',
+  },
+  heroStatValueInProgress: {
+    color: '#fef3c7',
+  },
+  heroStatValueDone: {
+    color: '#dcfce7',
+  },
   tabRow: {
     flexDirection: 'row',
     gap: 10,
-    paddingHorizontal: 16,
-    paddingTop: 12,
-    paddingBottom: 16,
+    paddingHorizontal: 14,
+    paddingTop: 10,
+    paddingBottom: 14,
     borderTopWidth: 1,
-    borderTopColor: '#253043',
-    backgroundColor: '#111827',
+    borderTopColor: '#202b3c',
+    backgroundColor: '#0f1728',
   },
   tabButton: {
     flex: 1,
@@ -1479,44 +1586,11 @@ const styles = StyleSheet.create({
     height: 6,
     borderRadius: 3,
   },
-  iconCalendar: {
+  iconCalendarSvgWrap: {
     width: 22,
     height: 20,
-    borderRadius: 6,
-    borderWidth: 2,
-    paddingTop: 3,
-    alignItems: 'center',
-  },
-  iconCalendarPins: {
-    position: 'absolute',
-    top: -3,
-    width: 14,
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-  },
-  iconCalendarPin: {
-    width: 3,
-    height: 5,
-    borderRadius: 2,
-  },
-  iconCalendarLine: {
-    width: 12,
-    height: 2,
-    borderRadius: 999,
-    marginTop: 2,
-    marginBottom: 3,
-  },
-  iconCalendarGrid: {
-    width: 12,
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    gap: 2,
     justifyContent: 'center',
-  },
-  iconCalendarCell: {
-    width: 4,
-    height: 4,
-    borderRadius: 1,
+    alignItems: 'center',
   },
   iconTasks: {
     width: 22,
@@ -1569,16 +1643,28 @@ const styles = StyleSheet.create({
     marginTop: 2,
   },
   panel: {
-    backgroundColor: '#1f2937',
-    borderRadius: 20,
-    padding: 18,
-    gap: 12,
-    borderWidth: 1,
-    borderColor: '#374151',
+    gap: 14,
   },
   panelTitle: {
     color: '#f9fafb',
-    fontSize: 18,
+    fontSize: 22,
+    fontWeight: '800',
+  },
+  sectionHeadingRow: {
+    flexDirection: 'row',
+    alignItems: 'baseline',
+    justifyContent: 'space-between',
+    gap: 12,
+  },
+  sectionEyebrow: {
+    color: '#cbd5e1',
+    fontSize: 13,
+    fontWeight: '800',
+    letterSpacing: 0.6,
+  },
+  sectionMeta: {
+    color: '#64748b',
+    fontSize: 12,
     fontWeight: '700',
   },
   row: {
@@ -1643,14 +1729,6 @@ const styles = StyleSheet.create({
     color: '#9ca3af',
     fontSize: 13,
     fontWeight: '600',
-  },
-  taskCard: {
-    backgroundColor: '#111827',
-    borderRadius: 16,
-    borderWidth: 1,
-    borderColor: '#374151',
-    padding: 14,
-    gap: 12,
   },
   taskMeta: {
     gap: 4,
@@ -1780,18 +1858,18 @@ const styles = StyleSheet.create({
   },
   segmentedControl: {
     flexDirection: 'row',
-    backgroundColor: '#111827',
+    backgroundColor: '#121b2a',
     borderRadius: 999,
     borderWidth: 1,
-    borderColor: '#374151',
+    borderColor: '#2a3648',
     padding: 4,
   },
   segmentedControlWide: {
     flexDirection: 'row',
-    backgroundColor: '#111827',
-    borderRadius: 14,
+    backgroundColor: '#121b2a',
+    borderRadius: 16,
     borderWidth: 1,
-    borderColor: '#374151',
+    borderColor: '#2a3648',
     padding: 4,
   },
   segmentedItem: {
@@ -1820,10 +1898,10 @@ const styles = StyleSheet.create({
     color: '#d1d5db',
   },
   todayPill: {
-    backgroundColor: '#111827',
+    backgroundColor: '#121b2a',
     borderRadius: 999,
     borderWidth: 1,
-    borderColor: '#374151',
+    borderColor: '#2a3648',
     paddingHorizontal: 12,
     paddingVertical: 7,
   },
@@ -1854,10 +1932,10 @@ const styles = StyleSheet.create({
   },
   calendarCell: {
     minHeight: 84,
-    backgroundColor: '#111827',
-    borderRadius: 12,
+    backgroundColor: '#141d2d',
+    borderRadius: 16,
     borderWidth: 1,
-    borderColor: '#374151',
+    borderColor: '#2b3648',
     paddingVertical: 8,
     paddingHorizontal: 4,
     alignItems: 'center',
@@ -1899,10 +1977,10 @@ const styles = StyleSheet.create({
     textDecorationLine: 'underline',
   },
   input: {
-    backgroundColor: '#111827',
-    borderRadius: 14,
+    backgroundColor: '#121b2a',
+    borderRadius: 16,
     borderWidth: 1,
-    borderColor: '#374151',
+    borderColor: '#2b3648',
     color: '#f9fafb',
     fontSize: 15,
     paddingHorizontal: 14,
@@ -2043,19 +2121,19 @@ const styles = StyleSheet.create({
     gap: 10,
   },
   ruleCard: {
-    backgroundColor: '#111827',
-    borderRadius: 16,
+    backgroundColor: '#141d2d',
+    borderRadius: 18,
     borderWidth: 1,
-    borderColor: '#374151',
-    padding: 14,
+    borderColor: '#2b3648',
+    padding: 16,
     gap: 12,
   },
   helperCard: {
-    backgroundColor: '#111827',
-    borderRadius: 16,
+    backgroundColor: '#141d2d',
+    borderRadius: 18,
     borderWidth: 1,
-    borderColor: '#374151',
-    padding: 14,
+    borderColor: '#2b3648',
+    padding: 16,
     gap: 6,
   },
   confirmModalCard: {
@@ -2084,10 +2162,10 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'space-between',
     gap: 12,
-    backgroundColor: '#111827',
-    borderRadius: 14,
+    backgroundColor: '#141d2d',
+    borderRadius: 18,
     borderWidth: 1,
-    borderColor: '#374151',
+    borderColor: '#2b3648',
     paddingHorizontal: 14,
     paddingVertical: 12,
   },

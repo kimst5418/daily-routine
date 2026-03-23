@@ -181,11 +181,11 @@ const styles = StyleSheet.create({
   taskCard: {
     flexDirection: 'row',
     gap: 12,
-    borderRadius: 18,
+    borderRadius: 22,
     borderWidth: 1,
-    borderColor: '#243041',
-    backgroundColor: '#101826',
-    padding: 16,
+    borderColor: '#2b3648',
+    backgroundColor: '#141d2d',
+    padding: 18,
     alignItems: 'flex-start',
     position: 'relative',
   },
@@ -213,14 +213,14 @@ const styles = StyleSheet.create({
     paddingHorizontal: 10,
     paddingVertical: 5,
     borderRadius: 999,
-    backgroundColor: '#1d4ed8',
+    backgroundColor: '#16325c',
   },
   taskCategory: {
     color: '#dbeafe',
     fontWeight: '600',
   },
   taskRepeat: {
-    color: '#9ca3af',
+    color: '#94a3b8',
     fontSize: 13,
   },
   statusBadge: {
@@ -266,10 +266,10 @@ const styles = StyleSheet.create({
   },
   actionColumn: {
     gap: 8,
-    alignItems: 'center',
+    alignItems: 'stretch',
     justifyContent: 'center',
     alignSelf: 'stretch',
-    paddingRight: 12,
+    paddingRight: 0,
   },
   compactStatusButton: {
     minWidth: 72,
@@ -277,7 +277,7 @@ const styles = StyleSheet.create({
     paddingVertical: 10,
   },
   pendingStatusButton: {
-    backgroundColor: '#374151',
+    backgroundColor: '#334155',
   },
   pendingStatusButtonText: {
     color: '#f9fafb',
