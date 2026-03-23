@@ -32,14 +32,6 @@ import {
   deactivateReminderRule,
   listReminderRules,
 } from './src/data/reminders';
-import {
-  cancelPendingReminderEventsByTaskTicket,
-  completeReminderEventCycle,
-  cancelPendingReminderEventsByRelatedTask,
-  createReminderEvent,
-  listDueReminderEvents,
-  listReminderEvents,
-} from './src/data/reminder-events';
 import type {
   ReminderRule,
   Task,
@@ -53,50 +45,39 @@ import {
   fromDateKey,
   getMonthLabel,
   getMonthStart,
-  getWeekStart,
   isSameMonth,
   shiftMonth,
   toDateKey,
 } from './src/lib/date';
+import { TaskItemCard } from './src/components/TaskItemCard';
 import {
-  cancelScheduledNotification,
-  calculateRepeatUntil,
-  ensureNotificationPermissions,
-  isExpoGo,
-  scheduleReminderNotification,
-} from './src/lib/notifications';
-import { addMinutes, formatKoreanTime } from './src/lib/time';
-
-const categories: TaskCategory[] = ['운동', '공부', '생활', '기타'];
-const weekdays = [
-  { label: '일', value: 0 },
-  { label: '월', value: 1 },
-  { label: '화', value: 2 },
-  { label: '수', value: 3 },
-  { label: '목', value: 4 },
-  { label: '금', value: 5 },
-  { label: '토', value: 6 },
-];
-const tabs = [
-  { key: 'today', label: '오늘' },
-  { key: 'calendar', label: '달력' },
-  { key: 'tasks', label: '테스크' },
-  { key: 'reminders', label: '알림' },
-] as const;
+  expireReminderEventsForTask,
+  handleReminderEventsAfterTaskStatusChange,
+  rescheduleDueReminderEvents,
+} from './src/features/reminders/reminder-workflow';
+import {
+  categories,
+  filterTaskItems,
+  formatDelayMinutes,
+  formatOptionalTime,
+  formatRepeatDays,
+  getNextTaskStatus,
+  getStatusActionLabel,
+  getWeekdayLabel,
+  hasActiveReminderRule,
+  tabs,
+  type CalendarStatusFilter,
+  weekdays,
+} from './src/features/tasks/task-presentation';
 
 type AppTab = (typeof tabs)[number]['key'];
 type CalendarViewMode = 'MONTH' | 'WEEK';
-type CalendarStatusFilter = 'ALL' | 'DONE' | 'PENDING' | 'IN_PROGRESS';
 
 export default function App() {
   const reminderEngineRunningRef = useRef(false);
   const [activeTab, setActiveTab] = useState<AppTab>('today');
   const [showTaskHelp, setShowTaskHelp] = useState(false);
   const [showReminderHelp, setShowReminderHelp] = useState(false);
-  const [dbReady, setDbReady] = useState(false);
-  const [permissionLabel, setPermissionLabel] = useState(
-    isExpoGo() ? 'Expo Go에서는 알림 비활성화' : '알림 권한 확인 필요'
-  );
   const [todayItems, setTodayItems] = useState<TodayTaskItem[]>([]);
   const [loadingTasks, setLoadingTasks] = useState(true);
   const [title, setTitle] = useState('');
@@ -153,14 +134,11 @@ export default function App() {
           }년 ${weekEndDate.getMonth() + 1}/${weekEndDate.getDate()}`;
   const triggerTaskName =
     tasks.find((task) => task.id === ruleTriggerTaskId)?.title ?? '기준 테스크';
-  const filteredSelectedItems = selectedItems.filter((item) => {
-    const matchesStatus =
-      calendarStatusFilter === 'ALL' ? true : item.status === calendarStatusFilter;
-    const matchesCategory =
-      calendarCategoryFilter === 'ALL' ? true : item.task.category === calendarCategoryFilter;
-
-    return matchesStatus && matchesCategory;
-  });
+  const filteredSelectedItems = filterTaskItems(
+    selectedItems,
+    calendarStatusFilter,
+    calendarCategoryFilter
+  );
   const monthPickerLabel = `${monthPickerYear}년`;
 
   const heroContent: Record<
@@ -201,95 +179,6 @@ export default function App() {
       subtitle: activeReminderRuleCount > 0 ? `${activeReminderRuleCount}개 활성` : '',
     },
   };
-
-  function filterCalendarItems(items: TodayTaskItem[]) {
-    return items.filter((item) => {
-      const matchesStatus =
-        calendarStatusFilter === 'ALL' ? true : item.status === calendarStatusFilter;
-      const matchesCategory =
-        calendarCategoryFilter === 'ALL' ? true : item.task.category === calendarCategoryFilter;
-
-      return matchesStatus && matchesCategory;
-    });
-  }
-
-  function formatDelayMinutes(delayMinutes: number) {
-    const hours = Math.floor(delayMinutes / 60);
-    const minutes = delayMinutes % 60;
-
-    if (hours > 0 && minutes > 0) {
-      return `${hours}시간 ${minutes}분`;
-    }
-
-    if (hours > 0) {
-      return `${hours}시간`;
-    }
-
-    return `${minutes}분`;
-  }
-
-  function formatRepeatDays(days: number[]) {
-    return days
-      .map((day) => weekdays.find((item) => item.value === day)?.label ?? String(day))
-      .join(', ');
-  }
-
-  function getTaskStatusLabel(status: TodayTaskItem['status']) {
-    switch (status) {
-      case 'PENDING':
-        return '예정';
-      case 'IN_PROGRESS':
-        return '진행중';
-      case 'DONE':
-        return '완료';
-      default:
-        return status;
-    }
-  }
-
-  function getTaskStatusTone(status: TodayTaskItem['status']) {
-    switch (status) {
-      case 'DONE':
-        return {
-          container: styles.statusBadgeDone,
-          text: styles.statusBadgeDoneText,
-        };
-      case 'IN_PROGRESS':
-        return {
-          container: styles.statusBadgeInProgress,
-          text: styles.statusBadgeInProgressText,
-        };
-      default:
-        return {
-          container: styles.statusBadgePending,
-          text: styles.statusBadgePendingText,
-        };
-    }
-  }
-
-  function getStatusActionLabel(item: TodayTaskItem) {
-    if (item.status === 'DONE') {
-      return '완료 취소';
-    }
-
-    if (item.status === 'IN_PROGRESS') {
-      return '진행 중단';
-    }
-
-    return rules.some((rule) => rule.isActive && rule.templateId === item.task.id) ? '시작하기' : '완료 처리';
-  }
-
-  function getWeekdayLabel(dateKey: string) {
-    return weekdays[fromDateKey(dateKey).getDay()]?.label ?? '';
-  }
-
-  function formatOptionalTime(isoString?: string | null, emptyLabel = '-') {
-    if (!isoString) {
-      return emptyLabel;
-    }
-
-    return formatKoreanTime(isoString);
-  }
 
   function resetTaskForm() {
     setEditingTaskId(null);
@@ -369,7 +258,6 @@ export default function App() {
           return;
         }
 
-        setDbReady(true);
         setTodayItems(items);
         setSelectedItems(items);
         setCalendarItemsByDate(itemsByDate);
@@ -384,8 +272,6 @@ export default function App() {
         if (!active) {
           return;
         }
-
-        setPermissionLabel('초기 데이터 로딩 중 오류 발생');
       } finally {
         if (active) {
           setLoadingTasks(false);
@@ -402,7 +288,7 @@ export default function App() {
 
   useEffect(() => {
     const intervalId = setInterval(() => {
-      void runReminderRescheduleEngine();
+      void runReminderEngineSafely();
     }, 30000);
 
     return () => {
@@ -450,71 +336,14 @@ export default function App() {
     reminderEngineRunningRef.current = true;
 
     try {
-      const nowIso = new Date().toISOString();
-      const [dueEvents, allRules] = await Promise.all([
-        listDueReminderEvents(nowIso),
-        listReminderRules(),
-      ]);
-
-      if (dueEvents.length === 0) {
-        return;
-      }
-
-      const ruleMap = new Map(allRules.map((rule) => [rule.id, rule]));
-
-      for (const event of dueEvents) {
-        const rule = ruleMap.get(event.ruleId);
-        const intervalMinutes = event.repeatIntervalMinutes ?? rule?.repeatIntervalMinutes ?? null;
-
-        if (!rule || !intervalMinutes || intervalMinutes <= 0) {
-          await completeReminderEventCycle({
-            eventId: event.id,
-            sentAt: nowIso,
-          });
-          continue;
-        }
-
-        let nextScheduledAt = addMinutes(event.scheduledAt, intervalMinutes);
-        while (nextScheduledAt <= nowIso) {
-          nextScheduledAt = addMinutes(nextScheduledAt, intervalMinutes);
-        }
-
-        if (event.repeatUntil && nextScheduledAt > event.repeatUntil) {
-          await completeReminderEventCycle({
-            eventId: event.id,
-            sentAt: nowIso,
-          });
-          continue;
-        }
-
-        const notificationRequestId = await scheduleReminderNotification({
-          title: '루틴 체크 알림',
-          body: rule.message,
-          scheduledAt: nextScheduledAt,
-        });
-
-        await completeReminderEventCycle({
-          eventId: event.id,
-          sentAt: nowIso,
-          nextScheduledAt,
-          notificationRequestId,
-        });
-      }
-
+      await rescheduleDueReminderEvents();
     } finally {
       reminderEngineRunningRef.current = false;
     }
   }
 
-  async function handlePermissionPress() {
-    const permission = await ensureNotificationPermissions();
-    setPermissionLabel(
-      isExpoGo()
-        ? 'Expo Go에서는 알림 비활성화'
-        : permission.granted
-          ? '알림 권한 허용됨'
-          : '알림 권한 미허용'
-    );
+  async function runReminderEngineSafely() {
+    await runReminderRescheduleEngine();
   }
 
   async function handleStatusPress(
@@ -523,54 +352,19 @@ export default function App() {
     currentStatus: TodayTaskItem['status'],
     dateKey: string
   ) {
-    const hasLinkedRules = rules.some((rule) => rule.isActive && rule.templateId === templateId);
-    const nextStatus =
-      currentStatus === 'PENDING'
-        ? hasLinkedRules
-          ? 'IN_PROGRESS'
-          : 'DONE'
-        : 'PENDING';
+    // 버튼 클릭 한 번으로 상태 변경과 알림 후속 처리를 함께 맞춘다.
+    const hasLinkedRules = hasActiveReminderRule(rules, templateId);
+    const nextStatus = getNextTaskStatus(currentStatus, hasLinkedRules);
     const ticket = await setTaskStatus(ticketId, nextStatus);
-
-    if (currentStatus === 'IN_PROGRESS' || currentStatus === 'DONE') {
-      const canceledEvents = await cancelPendingReminderEventsByTaskTicket(ticketId);
-      await Promise.all(
-        canceledEvents.map((event) =>
-          event.notificationRequestId
-            ? cancelScheduledNotification(event.notificationRequestId)
-            : Promise.resolve()
-        )
-      );
-    }
-
+    await handleReminderEventsAfterTaskStatusChange({
+      ticketId,
+      templateId,
+      currentStatus,
+      nextStatus,
+      ticket,
+      rules,
+    });
     await refreshTaskViews(dateKey, visibleMonth);
-
-    if (nextStatus === 'IN_PROGRESS' && ticket?.openedAt) {
-      const matchedRules = rules.filter((rule) => rule.isActive && rule.templateId === templateId);
-
-      for (const rule of matchedRules) {
-        const scheduledAt = addMinutes(ticket.openedAt, rule.delayMinutes);
-        const notificationRequestId = await scheduleReminderNotification({
-          title: '루틴 체크 알림',
-          body: rule.message,
-          scheduledAt,
-        });
-
-        await createReminderEvent({
-          ruleId: rule.id,
-          taskTicketId: ticket.id,
-          scheduledAt,
-          repeatIntervalMinutes: rule.repeatIntervalMinutes ?? null,
-          repeatUntil: calculateRepeatUntil(ticket.openedAt, rule.delayMinutes),
-          notificationRequestId,
-        });
-      }
-
-      await refreshTaskViews(dateKey, visibleMonth);
-      return;
-    }
-
-    await runReminderRescheduleEngine();
   }
 
   function toggleRepeatDay(day: number) {
@@ -646,15 +440,7 @@ export default function App() {
   async function handleDeactivateTask(task: Task) {
     setFormMessage('');
 
-    const canceledEvents = await cancelPendingReminderEventsByRelatedTask(task.id);
-    await Promise.all(
-      canceledEvents.map((event) =>
-        event.notificationRequestId
-          ? cancelScheduledNotification(event.notificationRequestId)
-          : Promise.resolve()
-      )
-    );
-
+    await expireReminderEventsForTask(task.id);
     await deactivateReminderRulesByTask(task.id);
     await deactivateTask(task.id);
     await refreshTaskViews(selectedDate, visibleMonth);
@@ -714,7 +500,7 @@ export default function App() {
       return;
     }
 
-    if (rules.some((rule) => rule.isActive && rule.templateId === ruleTriggerTaskId)) {
+    if (hasActiveReminderRule(rules, ruleTriggerTaskId)) {
       setRuleFeedback('테스크당 알림 규칙은 1개만 연결할 수 있습니다.');
       return;
     }
@@ -747,7 +533,7 @@ export default function App() {
   async function handleDeactivateRule(ruleId: string) {
     await deactivateReminderRule(ruleId);
     await refreshMetadata();
-    await runReminderRescheduleEngine();
+    await runReminderEngineSafely();
   }
 
   const calendarPanResponder = PanResponder.create({
@@ -816,47 +602,25 @@ export default function App() {
             {loadingTasks ? (
               <ActivityIndicator color="#f59e0b" />
             ) : (
+              // 오늘 탭은 reminder 종료시간까지 함께 보여준다.
               todayItems.map((item) => (
-                <View key={item.task.id} style={styles.taskCard}>
-                  <View style={styles.taskMeta}>
-                    <View style={styles.taskHeaderRow}>
-                      <Text style={styles.taskTitle}>{item.task.title}</Text>
-                      <View style={styles.taskCategoryBadge}>
-                        <Text style={styles.taskCategory}>{item.task.category}</Text>
-                      </View>
-                    </View>
-                    <View style={[styles.statusBadge, getTaskStatusTone(item.status).container]}>
-                      <Text style={[styles.statusBadgeText, getTaskStatusTone(item.status).text]}>
-                        {getTaskStatusLabel(item.status)}
-                      </Text>
-                    </View>
-                    {item.status === 'DONE' ? (
-                      <Text style={styles.taskRepeat}>
-                        완료시간: {formatOptionalTime(item.checkedAt)}
-                      </Text>
-                    ) : null}
-                    {rules.some((rule) => rule.isActive && rule.templateId === item.task.id) ? (
-                      <Text style={styles.taskRepeat}>
-                        알림 종료시간: {formatOptionalTime(item.reminderEndAt, '없음')}
-                      </Text>
-                    ) : null}
-                  </View>
-                  <Pressable
-                    style={[
-                      styles.statusButton,
-                      item.status === 'DONE'
-                        ? styles.statusDone
-                        : item.status === 'IN_PROGRESS'
-                          ? styles.statusInProgress
-                          : styles.statusPending,
-                    ]}
-                    onPress={() =>
-                      handleStatusPress(item.ticket.id, item.task.id, item.status, today)
-                    }
-                  >
-                    <Text style={styles.statusButtonText}>{getStatusActionLabel(item)}</Text>
-                  </Pressable>
-                </View>
+                <TaskItemCard
+                  key={item.task.id}
+                  item={item}
+                  actionLabel={getStatusActionLabel(
+                    item,
+                    hasActiveReminderRule(rules, item.task.id)
+                  )}
+                  checkedAtLabel={item.status === 'DONE' ? formatOptionalTime(item.checkedAt) : null}
+                  reminderEndAtLabel={
+                    hasActiveReminderRule(rules, item.task.id)
+                      ? formatOptionalTime(item.reminderEndAt, '없음')
+                      : null
+                  }
+                  onPress={() =>
+                    handleStatusPress(item.ticket.id, item.task.id, item.status, today)
+                  }
+                />
               ))
             )}
             {!loadingTasks && todayItems.length === 0 ? (
@@ -1014,7 +778,12 @@ export default function App() {
                 {...calendarPanResponder.panHandlers}
               >
                 {calendarGrid.map((dateKey) => {
-                  const dayItems = filterCalendarItems(calendarItemsByDate[dateKey] ?? []);
+                  // 달력 셀은 현재 필터가 적용된 결과만 집계해서 비율을 계산한다.
+                  const dayItems = filterTaskItems(
+                    calendarItemsByDate[dateKey] ?? [],
+                    calendarStatusFilter,
+                    calendarCategoryFilter
+                  );
                   const inCurrentMonth = isSameMonth(visibleMonth, dateKey);
                   const selected = dateKey === selectedDate;
                   const isToday = dateKey === today;
@@ -1073,39 +842,18 @@ export default function App() {
               <Text style={styles.panelTitle}>선택 날짜 상세</Text>
               <Text style={styles.caption}>{`${selectedDate} · ${filteredSelectedItems.length}개`}</Text>
               {filteredSelectedItems.map((item) => (
-                <View key={item.ticket.id} style={styles.taskCard}>
-                  <View style={styles.taskMeta}>
-                    <View style={styles.taskHeaderRow}>
-                      <Text style={styles.taskTitle}>{item.task.title}</Text>
-                      <View style={styles.taskCategoryBadge}>
-                        <Text style={styles.taskCategory}>{item.task.category}</Text>
-                      </View>
-                    </View>
-                    <View style={[styles.statusBadge, getTaskStatusTone(item.status).container]}>
-                      <Text style={[styles.statusBadgeText, getTaskStatusTone(item.status).text]}>
-                        {getTaskStatusLabel(item.status)}
-                      </Text>
-                    </View>
-                    {item.status === 'DONE' ? (
-                      <Text style={styles.taskRepeat}>완료시간: {formatOptionalTime(item.checkedAt)}</Text>
-                    ) : null}
-                  </View>
-                  <Pressable
-                    style={[
-                      styles.statusButton,
-                      item.status === 'DONE'
-                        ? styles.statusDone
-                        : item.status === 'IN_PROGRESS'
-                          ? styles.statusInProgress
-                          : styles.statusPending,
-                    ]}
-                    onPress={() =>
-                      handleStatusPress(item.ticket.id, item.task.id, item.status, selectedDate)
-                    }
-                  >
-                    <Text style={styles.statusButtonText}>{getStatusActionLabel(item)}</Text>
-                  </Pressable>
-                </View>
+                <TaskItemCard
+                  key={item.ticket.id}
+                  item={item}
+                  actionLabel={getStatusActionLabel(
+                    item,
+                    hasActiveReminderRule(rules, item.task.id)
+                  )}
+                  checkedAtLabel={item.status === 'DONE' ? formatOptionalTime(item.checkedAt) : null}
+                  onPress={() =>
+                    handleStatusPress(item.ticket.id, item.task.id, item.status, selectedDate)
+                  }
+                />
               ))}
               {filteredSelectedItems.length === 0 ? (
                 <Text style={styles.emptyText}>선택한 날짜에 필터 조건과 맞는 테스크가 없습니다.</Text>

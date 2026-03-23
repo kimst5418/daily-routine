@@ -40,6 +40,27 @@ export type DateCompletionSummary = {
   done: number;
 };
 
+const taskItemSelectColumns = `
+  t.id AS template_id,
+  r.id AS recurrence_rule_id,
+  t.title,
+  t.category,
+  r.repeat_type,
+  r.repeat_days,
+  r.starts_on,
+  t.is_active,
+  t.memo,
+  t.created_at,
+  t.updated_at,
+  tt.id AS ticket_id,
+  tt.task_date,
+  tt.status AS ticket_status,
+  tt.opened_at,
+  tt.completed_at,
+  tt.created_at AS ticket_created_at,
+  tt.updated_at AS ticket_updated_at
+`;
+
 function mapRowToTask(row: any): Task {
   return {
     id: row.template_id,
@@ -67,6 +88,17 @@ function mapRowToTicket(row: any): TaskTicket {
     completedAt: row.completed_at,
     createdAt: row.ticket_created_at,
     updatedAt: row.ticket_updated_at,
+  };
+}
+
+function mapRowToTodayTaskItem(row: any): TodayTaskItem {
+  // 화면에서는 템플릿/티켓/알림 종료 시각을 한 묶음으로 다루기 때문에 여기서 합쳐 둔다.
+  return {
+    task: mapRowToTask(row),
+    ticket: mapRowToTicket(row),
+    status: row.ticket_status as TaskTicketStatus,
+    checkedAt: row.completed_at as string | null,
+    reminderEndAt: (row.reminder_end_at as string | null | undefined) ?? null,
   };
 }
 
@@ -288,24 +320,7 @@ export async function getTaskItemsForDate(dateKey: string): Promise<TodayTaskIte
   const rows = await db.getAllAsync<any>(
     `
       SELECT
-        t.id AS template_id,
-        r.id AS recurrence_rule_id,
-        t.title,
-        t.category,
-        r.repeat_type,
-        r.repeat_days,
-        r.starts_on,
-        t.is_active,
-        t.memo,
-        t.created_at,
-        t.updated_at,
-        tt.id AS ticket_id,
-        tt.task_date,
-        tt.status AS ticket_status,
-        tt.opened_at,
-        tt.completed_at,
-        tt.created_at AS ticket_created_at,
-        tt.updated_at AS ticket_updated_at,
+        ${taskItemSelectColumns},
         MAX(CASE WHEN re.status = 'PENDING' THEN re.repeat_until ELSE NULL END) AS reminder_end_at
       FROM task_tickets tt
       INNER JOIN task_templates t ON t.id = tt.template_id
@@ -318,15 +333,8 @@ export async function getTaskItemsForDate(dateKey: string): Promise<TodayTaskIte
     [dateKey]
   );
 
-  return rows
-    .map((row) => ({
-      task: mapRowToTask(row),
-      ticket: mapRowToTicket(row),
-      status: row.ticket_status as TaskTicketStatus,
-      checkedAt: row.completed_at as string | null,
-      reminderEndAt: row.reminder_end_at as string | null,
-    }))
-    .sort(sortItems);
+  // 날짜 상세 화면에서는 바로 렌더링할 수 있는 형태로 변환해서 반환한다.
+  return rows.map(mapRowToTodayTaskItem).sort(sortItems);
 }
 
 export async function getTaskItemsForDates(dateKeys: string[]) {
@@ -341,24 +349,7 @@ export async function getTaskItemsForDates(dateKeys: string[]) {
   const rows = await db.getAllAsync<any>(
     `
       SELECT
-        t.id AS template_id,
-        r.id AS recurrence_rule_id,
-        t.title,
-        t.category,
-        r.repeat_type,
-        r.repeat_days,
-        r.starts_on,
-        t.is_active,
-        t.memo,
-        t.created_at,
-        t.updated_at,
-        tt.id AS ticket_id,
-        tt.task_date,
-        tt.status AS ticket_status,
-        tt.opened_at,
-        tt.completed_at,
-        tt.created_at AS ticket_created_at,
-        tt.updated_at AS ticket_updated_at
+        ${taskItemSelectColumns}
       FROM task_tickets tt
       INNER JOIN task_templates t ON t.id = tt.template_id
       INNER JOIN recurrence_rules r ON r.id = tt.recurrence_rule_id
@@ -375,16 +366,11 @@ export async function getTaskItemsForDates(dateKeys: string[]) {
 
   for (const row of rows) {
     const dateKey = row.task_date as string;
-    result[dateKey].push({
-      task: mapRowToTask(row),
-      ticket: mapRowToTicket(row),
-      status: row.ticket_status as TaskTicketStatus,
-      checkedAt: row.completed_at as string | null,
-      reminderEndAt: null,
-    });
+    result[dateKey].push(mapRowToTodayTaskItem(row));
   }
 
   for (const dateKey of sortedDateKeys) {
+    // 달력 셀과 상세 목록이 같은 정렬 기준을 쓰도록 날짜별로 다시 정렬한다.
     result[dateKey].sort(sortItems);
   }
 
@@ -441,6 +427,7 @@ export async function setTaskStatus(ticketId: string, status: TaskTicketStatus) 
   }
 
   const now = new Date().toISOString();
+  // PENDING 으로 돌아갈 때는 진행/완료 시각을 비우고, 처음 시작할 때만 openedAt 을 채운다.
   const openedAt =
     status === 'PENDING' ? null : existing.opened_at ?? now;
   const completedAt = status === 'DONE' ? now : null;
