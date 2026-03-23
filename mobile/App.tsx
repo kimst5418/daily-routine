@@ -79,7 +79,7 @@ import {
   type CalendarStatusFilter,
   weekdays,
 } from './src/features/tasks/task-presentation';
-import { getAppTheme, type AppTheme } from './src/theme';
+import { getAppTheme, type AppTheme, type ThemePreference } from './src/theme';
 
 type AppTab = (typeof tabs)[number]['key'];
 
@@ -286,16 +286,18 @@ function getCalendarCompletionTone(theme: AppTheme, completionRate: number) {
 
 export default function App() {
   const colorScheme = useColorScheme();
-  const theme = getAppTheme(colorScheme);
-  const styles = createStyles(theme);
   const scrollViewRef = useRef<ScrollView | null>(null);
   const [activeTab, setActiveTab] = useState<AppTab>('today');
+  const [themePreference, setThemePreference] = useState<ThemePreference>('SYSTEM');
+  const theme = getAppTheme(colorScheme, themePreference);
+  const styles = createStyles(theme);
   const [showTaskHelp, setShowTaskHelp] = useState(false);
   const [permissionLabel, setPermissionLabel] = useState(
     isExpoGo() ? 'Expo Go에서는 알림이 비활성화됩니다.' : '알림 권한 확인 필요'
   );
   const [todayItems, setTodayItems] = useState<TodayTaskItem[]>([]);
   const [loadingTasks, setLoadingTasks] = useState(true);
+  const [availableCategories, setAvailableCategories] = useState<TaskCategory[]>(categories);
   const [title, setTitle] = useState('');
   const [category, setCategory] = useState<TaskCategory>('기타');
   const [repeatType, setRepeatType] = useState<TaskRepeatType>('DAILY');
@@ -323,6 +325,8 @@ export default function App() {
   const [ruleMessage, setRuleMessage] = useState('');
   const [ruleFeedback, setRuleFeedback] = useState('');
   const [savingRule, setSavingRule] = useState(false);
+  const [settingsCategoryDraft, setSettingsCategoryDraft] = useState('');
+  const [settingsMessage, setSettingsMessage] = useState('');
 
   const today = toDateKey(new Date());
   const todayDoneCount = todayItems.filter((item) => item.status === 'DONE').length;
@@ -372,6 +376,11 @@ export default function App() {
       title: '루틴',
       subtitle: editingTaskId ? '수정 중' : '',
     },
+    settings: {
+      eyebrow: '',
+      title: '설정',
+      subtitle: '테마와 옵션을 정리하세요.',
+    },
   };
 
   function resetTaskForm() {
@@ -407,6 +416,47 @@ export default function App() {
   function resetCalendarFilters() {
     setCalendarStatusFilter('ALL');
     setCalendarCategoryFilter('ALL');
+  }
+
+  function addCategoryOption() {
+    const nextCategory = settingsCategoryDraft.trim();
+    if (!nextCategory) {
+      setSettingsMessage('카테고리 이름을 입력해주세요.');
+      return;
+    }
+
+    if (availableCategories.includes(nextCategory)) {
+      setSettingsMessage('이미 있는 카테고리입니다.');
+      return;
+    }
+
+    setAvailableCategories((prev) => [...prev, nextCategory]);
+    setSettingsCategoryDraft('');
+    setSettingsMessage(`"${nextCategory}" 카테고리를 추가했습니다.`);
+  }
+
+  function removeCategoryOption(targetCategory: TaskCategory) {
+    if (targetCategory === '기타') {
+      setSettingsMessage('"기타" 카테고리는 기본값으로 유지됩니다.');
+      return;
+    }
+
+    if (tasks.some((task) => task.category === targetCategory)) {
+      setSettingsMessage('활성 루틴에서 사용 중인 카테고리는 제거할 수 없습니다.');
+      return;
+    }
+
+    setAvailableCategories((prev) => prev.filter((item) => item !== targetCategory));
+
+    if (category === targetCategory) {
+      setCategory('기타');
+    }
+
+    if (calendarCategoryFilter === targetCategory) {
+      setCalendarCategoryFilter('ALL');
+    }
+
+    setSettingsMessage(`"${targetCategory}" 카테고리를 제거했습니다.`);
   }
 
   function openMonthPicker() {
@@ -454,6 +504,21 @@ export default function App() {
         setCalendarItemsByDate(itemsByDate);
         setTasks(allTasks);
         setRules(allRules);
+        setAvailableCategories((prev) =>
+          Array.from(new Set([...prev, ...allTasks.map((task) => task.category)])).sort(
+            (left, right) => {
+              if (left === '기타') {
+                return 1;
+              }
+
+              if (right === '기타') {
+                return -1;
+              }
+
+              return left.localeCompare(right, 'ko');
+            }
+          )
+        );
       } catch {
         if (!active) {
           return;
@@ -978,7 +1043,7 @@ export default function App() {
                 <View style={styles.filterBlock}>
                   <Text style={styles.filterLabel}>카테고리</Text>
                   <View style={styles.filterChipRow}>
-                    {(['ALL', ...categories] as Array<'ALL' | TaskCategory>).map((item) => (
+                    {(['ALL', ...availableCategories] as Array<'ALL' | TaskCategory>).map((item) => (
                       <Pressable
                         key={item}
                         style={[
@@ -1182,7 +1247,7 @@ export default function App() {
 
               <Text style={styles.fieldLabel}>카테고리</Text>
               <View style={styles.chipRow}>
-                {categories.map((item) => (
+                {availableCategories.map((item) => (
                   <Pressable
                     key={item}
                     style={[styles.chip, category === item ? styles.chipActive : styles.chipInactive]}
@@ -1409,6 +1474,118 @@ export default function App() {
               ) : (
                 <Text style={styles.emptyText}>활성 테스크가 없습니다.</Text>
               )}
+            </View>
+          </>
+        ) : null}
+
+        {activeTab === 'settings' ? (
+          <>
+            <View style={styles.panel}>
+              <View style={styles.sectionHeadingRow}>
+                <Text style={styles.sectionEyebrow}>테마</Text>
+                <Text style={styles.sectionMeta}>
+                  {themePreference === 'SYSTEM'
+                    ? '시스템'
+                    : themePreference === 'LIGHT'
+                      ? '라이트'
+                      : '네이비'}
+                </Text>
+              </View>
+              <View style={styles.segmentedControlWide}>
+                {(['SYSTEM', 'LIGHT', 'NAVY'] as ThemePreference[]).map((item) => (
+                  <Pressable
+                    key={item}
+                    style={[
+                      styles.segmentedItemFill,
+                      themePreference === item && styles.segmentedItemActive,
+                    ]}
+                    onPress={() => setThemePreference(item)}
+                  >
+                    <Text
+                      style={[
+                        styles.segmentedText,
+                        themePreference === item
+                          ? styles.segmentedTextActive
+                          : styles.segmentedTextInactive,
+                      ]}
+                    >
+                      {item === 'SYSTEM' ? '시스템' : item === 'LIGHT' ? '라이트' : '네이비'}
+                    </Text>
+                  </Pressable>
+                ))}
+              </View>
+            </View>
+
+            <View style={styles.panel}>
+              <View style={styles.sectionHeadingRow}>
+                <Text style={styles.sectionEyebrow}>카테고리</Text>
+                <Text style={styles.sectionMeta}>{availableCategories.length}개</Text>
+              </View>
+              <View style={styles.settingsInputRow}>
+                <TextInput
+                  style={[styles.input, styles.settingsInputFlex]}
+                  value={settingsCategoryDraft}
+                  onChangeText={setSettingsCategoryDraft}
+                  placeholder="새 카테고리 이름"
+                  placeholderTextColor={theme.colors.placeholder}
+                />
+                <Pressable style={styles.button} onPress={addCategoryOption}>
+                  <Text style={styles.buttonText}>추가</Text>
+                </Pressable>
+              </View>
+              <View style={styles.settingsCategoryList}>
+                {availableCategories.map((item) => {
+                  const removable = item !== '기타' && !tasks.some((task) => task.category === item);
+
+                  return (
+                    <View key={item} style={styles.settingsCategoryRow}>
+                      <View style={styles.taskCategoryBadge}>
+                        <Text style={styles.taskCategory}>{item}</Text>
+                      </View>
+                      <Pressable
+                        style={[
+                          styles.filterResetButton,
+                          !removable && styles.settingsActionDisabled,
+                        ]}
+                        onPress={() => removeCategoryOption(item)}
+                        disabled={!removable}
+                      >
+                        <Text style={styles.filterResetButtonText}>
+                          {item === '기타' ? '기본' : removable ? '삭제' : '사용중'}
+                        </Text>
+                      </Pressable>
+                    </View>
+                  );
+                })}
+              </View>
+              {settingsMessage ? <Text style={styles.formMessage}>{settingsMessage}</Text> : null}
+            </View>
+
+            <View style={styles.panel}>
+              <View style={styles.sectionHeadingRow}>
+                <Text style={styles.sectionEyebrow}>알림 설정</Text>
+                <Text style={styles.sectionMeta}>준비중</Text>
+              </View>
+              <View style={styles.helperCard}>
+                <Text style={styles.helperTitle}>설정 화면 껍데기</Text>
+                <Text style={styles.helperText}>
+                  알림 채널, 기본 메시지, 시간대별 묶음 옵션 같은 전역 알림 설정은 다음 단계에서 연결할 예정입니다.
+                </Text>
+              </View>
+              <View style={styles.settingsShellList}>
+                <View style={styles.settingsShellRow}>
+                  <Text style={styles.label}>기본 알림 사용</Text>
+                  <Text style={styles.value}>추가 예정</Text>
+                </View>
+                <View style={styles.settingsShellRow}>
+                  <Text style={styles.label}>조용한 시간대</Text>
+                  <Text style={styles.value}>추가 예정</Text>
+                </View>
+                <View style={styles.settingsShellRow}>
+                  <Text style={styles.label}>기본 메시지</Text>
+                  <Text style={styles.value}>추가 예정</Text>
+                </View>
+              </View>
             </View>
           </>
         ) : null}
@@ -2062,6 +2239,35 @@ const createStyles = (theme: AppTheme) => StyleSheet.create({
   inlineActionRow: {
     flexDirection: 'row',
     gap: 10,
+  },
+  settingsInputRow: {
+    flexDirection: 'row',
+    gap: 10,
+    alignItems: 'center',
+  },
+  settingsInputFlex: {
+    flex: 1,
+  },
+  settingsCategoryList: {
+    gap: 10,
+  },
+  settingsCategoryRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    gap: 12,
+  },
+  settingsActionDisabled: {
+    opacity: 0.5,
+  },
+  settingsShellList: {
+    gap: 10,
+  },
+  settingsShellRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    gap: 12,
+    paddingVertical: 4,
   },
   filterSection: {
     gap: 6,

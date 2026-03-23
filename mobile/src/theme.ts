@@ -1,6 +1,7 @@
 import type { ColorSchemeName } from 'react-native';
 
 export type ThemeName = 'light' | 'navy';
+export type ThemePreference = 'SYSTEM' | 'LIGHT' | 'NAVY';
 
 export type AppTheme = {
   name: ThemeName;
@@ -254,6 +255,17 @@ export const lightTheme: AppTheme = {
   },
 };
 
-export function getAppTheme(colorScheme: ColorSchemeName): AppTheme {
+export function getAppTheme(
+  colorScheme: ColorSchemeName,
+  preference: ThemePreference = 'SYSTEM'
+): AppTheme {
+  if (preference === 'LIGHT') {
+    return lightTheme;
+  }
+
+  if (preference === 'NAVY') {
+    return navyTheme;
+  }
+
   return colorScheme === 'dark' ? navyTheme : lightTheme;
 }

@@ -19,6 +19,7 @@ export const tabs = [
   { key: 'today', label: '오늘' },
   { key: 'calendar', label: '기록' },
   { key: 'tasks', label: '루틴' },
+  { key: 'settings', label: '설정' },
 ] as const;
 
 export type CalendarStatusFilter = 'ALL' | 'DONE' | 'PENDING' | 'IN_PROGRESS';

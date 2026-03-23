@@ -1,6 +1,6 @@
 export type TaskRepeatType = 'DAILY' | 'WEEKLY_DAYS';
 
-export type TaskCategory = '운동' | '공부' | '생활' | '기타';
+export type TaskCategory = string;
 
 export type TaskTicketStatus = 'PENDING' | 'IN_PROGRESS' | 'DONE';
 
