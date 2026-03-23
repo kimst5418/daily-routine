@@ -64,6 +64,10 @@ export async function scheduleReminderEventsForTaskStart(input: {
         title: '루틴 체크 알림',
         body: rule.message,
         scheduledAt: cycleScheduledAt,
+        data: {
+          ticketId: input.taskTicketId,
+          templateId: input.templateId,
+        },
       });
 
       if (notificationRequestId) {

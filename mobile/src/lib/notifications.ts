@@ -1,4 +1,13 @@
 import Constants from 'expo-constants';
+
+export const REMINDER_NOTIFICATION_CATEGORY_ID = 'routine-reminder-actions';
+export const REMINDER_COMPLETE_ACTION_ID = 'complete-ticket';
+
+type ReminderNotificationData = {
+  ticketId?: string;
+  templateId?: string;
+};
+
 export function isExpoGo() {
   return Constants.executionEnvironment === 'storeClient';
 }
@@ -6,6 +15,7 @@ export function isExpoGo() {
 let notificationsModulePromise: Promise<typeof import('expo-notifications')> | null = null;
 let handlerInitialized = false;
 let channelInitialized = false;
+let categoryInitialized = false;
 
 async function getNotificationsModule() {
   if (isExpoGo()) {
@@ -53,6 +63,29 @@ async function ensureDefaultChannel() {
   channelInitialized = true;
 }
 
+async function ensureReminderCategory() {
+  if (isExpoGo() || categoryInitialized) {
+    return;
+  }
+
+  const Notifications = await getNotificationsModule();
+  if (!Notifications) {
+    return;
+  }
+
+  await Notifications.setNotificationCategoryAsync(REMINDER_NOTIFICATION_CATEGORY_ID, [
+    {
+      identifier: REMINDER_COMPLETE_ACTION_ID,
+      buttonTitle: '완료',
+      options: {
+        opensAppToForeground: true,
+      },
+    },
+  ]);
+
+  categoryInitialized = true;
+}
+
 export async function ensureNotificationPermissions() {
   if (isExpoGo()) {
     return {
@@ -75,6 +108,7 @@ export async function ensureNotificationPermissions() {
   }
 
   await ensureDefaultChannel();
+  await ensureReminderCategory();
 
   const current = await Notifications.getPermissionsAsync();
 
@@ -107,6 +141,7 @@ export async function getNotificationPermissions() {
   }
 
   await ensureDefaultChannel();
+  await ensureReminderCategory();
   return Notifications.getPermissionsAsync();
 }
 
@@ -114,6 +149,7 @@ export async function scheduleReminderNotification(input: {
   title: string;
   body: string;
   scheduledAt: string;
+  data?: ReminderNotificationData;
 }) {
   if (isExpoGo()) {
     return null;
@@ -130,6 +166,7 @@ export async function scheduleReminderNotification(input: {
   }
 
   await ensureDefaultChannel();
+  await ensureReminderCategory();
 
   const secondsUntil = Math.max(
     1,
@@ -141,6 +178,8 @@ export async function scheduleReminderNotification(input: {
       title: input.title,
       body: input.body,
       sound: true,
+      categoryIdentifier: REMINDER_NOTIFICATION_CATEGORY_ID,
+      data: input.data,
     },
     trigger: {
       type: Notifications.SchedulableTriggerInputTypes.TIME_INTERVAL,
@@ -161,4 +200,39 @@ export async function cancelScheduledNotification(notificationRequestId: string)
   }
 
   await Notifications.cancelScheduledNotificationAsync(notificationRequestId);
+}
+
+export async function addReminderNotificationResponseListener(
+  onComplete: (payload: { ticketId: string; templateId?: string | null }) => void | Promise<void>
+) {
+  if (isExpoGo()) {
+    return () => {};
+  }
+
+  const Notifications = await getNotificationsModule();
+  if (!Notifications) {
+    return () => {};
+  }
+
+  await ensureReminderCategory();
+
+  const subscription = Notifications.addNotificationResponseReceivedListener((response) => {
+    if (response.actionIdentifier !== REMINDER_COMPLETE_ACTION_ID) {
+      return;
+    }
+
+    const data = (response.notification.request.content.data ?? {}) as ReminderNotificationData;
+    const ticketId = typeof data.ticketId === 'string' ? data.ticketId : null;
+    const templateId = typeof data.templateId === 'string' ? data.templateId : null;
+
+    if (!ticketId) {
+      return;
+    }
+
+    void onComplete({ ticketId, templateId });
+  });
+
+  return () => {
+    subscription.remove();
+  };
 }

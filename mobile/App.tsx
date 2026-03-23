@@ -58,6 +58,7 @@ import {
   handleReminderEventsAfterTaskStatusChange,
 } from './src/features/reminders/reminder-workflow';
 import {
+  addReminderNotificationResponseListener,
   ensureNotificationPermissions,
   getNotificationPermissions,
   isExpoGo,
@@ -308,6 +309,31 @@ export default function App() {
 
     void syncNotificationPermission(true);
   }, [activeTab]);
+
+  useEffect(() => {
+    let active = true;
+    let cleanup: (() => void) | undefined;
+
+    async function registerListener() {
+      cleanup = await addReminderNotificationResponseListener(async ({ ticketId }) => {
+        if (!active) {
+          return;
+        }
+
+        await setTaskStatus(ticketId, 'DONE');
+        await deleteReminderEventsForTaskTicket(ticketId);
+        await refreshTaskViews(selectedDate, visibleMonth);
+        await refreshMetadata();
+      });
+    }
+
+    void registerListener();
+
+    return () => {
+      active = false;
+      cleanup?.();
+    };
+  }, [selectedDate, visibleMonth]);
 
   async function refreshTaskViews(dateKey: string, monthKey: string) {
     if (dateKey === today) {
