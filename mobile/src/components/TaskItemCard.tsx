@@ -5,6 +5,7 @@ import {
   getTaskStatusLabel,
   getTaskStatusTone,
 } from '../features/tasks/task-presentation';
+import type { AppTheme } from '../theme';
 
 type TaskItemCardProps = {
   item: TodayTaskItem;
@@ -15,6 +16,7 @@ type TaskItemCardProps = {
   onDeletePress?: () => void;
   checkedAtLabel?: string | null;
   reminderEndAtLabel?: string | null;
+  theme: AppTheme;
 };
 
 export function TaskItemCard({
@@ -26,7 +28,9 @@ export function TaskItemCard({
   onDeletePress,
   checkedAtLabel,
   reminderEndAtLabel,
+  theme,
 }: TaskItemCardProps) {
+  const styles = createStyles(theme);
   // 오늘 목록과 달력 상세가 같은 카드 UI를 쓰도록 공통 렌더링만 담당한다.
   const tone = getTaskStatusTone(item.status);
   const getButtonTone = (label: string) => {
@@ -177,14 +181,14 @@ export function TaskItemCard({
   );
 }
 
-const styles = StyleSheet.create({
+const createStyles = (theme: AppTheme) => StyleSheet.create({
   taskCard: {
     flexDirection: 'row',
     gap: 12,
     borderRadius: 22,
     borderWidth: 1,
-    borderColor: '#2b3648',
-    backgroundColor: '#141d2d',
+    borderColor: theme.colors.border,
+    backgroundColor: theme.colors.cardBackground,
     padding: 18,
     alignItems: 'flex-start',
     position: 'relative',
@@ -205,7 +209,7 @@ const styles = StyleSheet.create({
   },
   taskTitle: {
     flex: 1,
-    color: '#f9fafb',
+    color: theme.colors.textPrimary,
     fontSize: 17,
     fontWeight: '700',
   },
@@ -213,14 +217,14 @@ const styles = StyleSheet.create({
     paddingHorizontal: 10,
     paddingVertical: 5,
     borderRadius: 999,
-    backgroundColor: '#16325c',
+    backgroundColor: theme.colors.categoryBackground,
   },
   taskCategory: {
-    color: '#dbeafe',
+    color: theme.colors.categoryText,
     fontWeight: '600',
   },
   taskRepeat: {
-    color: '#94a3b8',
+    color: theme.colors.textSoft,
     fontSize: 13,
   },
   statusBadge: {
@@ -234,22 +238,22 @@ const styles = StyleSheet.create({
     fontWeight: '700',
   },
   statusBadgePending: {
-    backgroundColor: '#374151',
+    backgroundColor: theme.colors.pendingBadgeBackground,
   },
   statusBadgePendingText: {
-    color: '#f9fafb',
+    color: theme.colors.pendingBadgeText,
   },
   statusBadgeInProgress: {
-    backgroundColor: '#f59e0b',
+    backgroundColor: theme.colors.inProgressBadgeBackground,
   },
   statusBadgeInProgressText: {
-    color: '#111827',
+    color: theme.colors.inProgressBadgeText,
   },
   statusBadgeDone: {
-    backgroundColor: '#10b981',
+    backgroundColor: theme.colors.doneBadgeBackground,
   },
   statusBadgeDoneText: {
-    color: '#052e16',
+    color: theme.colors.doneBadgeText,
   },
   statusButton: {
     minWidth: 100,
@@ -277,22 +281,22 @@ const styles = StyleSheet.create({
     paddingVertical: 10,
   },
   pendingStatusButton: {
-    backgroundColor: '#334155',
+    backgroundColor: theme.colors.pendingButtonBackground,
   },
   pendingStatusButtonText: {
-    color: '#f9fafb',
+    color: theme.colors.pendingButtonText,
   },
   inProgressStatusButton: {
-    backgroundColor: '#f59e0b',
+    backgroundColor: theme.colors.inProgressButtonBackground,
   },
   inProgressStatusButtonText: {
-    color: '#111827',
+    color: theme.colors.inProgressButtonText,
   },
   doneStatusButton: {
-    backgroundColor: '#10b981',
+    backgroundColor: theme.colors.doneButtonBackground,
   },
   doneStatusButtonText: {
-    color: '#052e16',
+    color: theme.colors.doneButtonText,
   },
   statusButtonText: {
     fontWeight: '700',
@@ -307,12 +311,12 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
     borderWidth: 1,
-    borderColor: '#5b2333',
-    backgroundColor: '#25131a',
+    borderColor: theme.colors.destructiveBorder,
+    backgroundColor: theme.colors.destructiveBackground,
     zIndex: 2,
   },
   deleteIconText: {
-    color: '#fca5a5',
+    color: theme.colors.destructiveText,
     fontSize: 12,
     fontWeight: '700',
   },

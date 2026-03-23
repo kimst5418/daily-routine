@@ -13,6 +13,7 @@ import {
   StyleSheet,
   Text,
   TextInput,
+  useColorScheme,
   View,
 } from 'react-native';
 
@@ -78,29 +79,115 @@ import {
   type CalendarStatusFilter,
   weekdays,
 } from './src/features/tasks/task-presentation';
+import { getAppTheme, type AppTheme } from './src/theme';
 
 type AppTab = (typeof tabs)[number]['key'];
 
-function BottomTabIcon({ tab, selected }: { tab: AppTab; selected: boolean }) {
-  const stroke = selected ? '#f59e0b' : '#9ca3af';
-  const fill = selected ? '#f59e0b' : '#374151';
+const iconStyles = StyleSheet.create({
+  iconToday: {
+    width: 22,
+    height: 22,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  iconTodayRing: {
+    width: 18,
+    height: 18,
+    borderRadius: 9,
+    borderWidth: 2,
+  },
+  iconTodayDot: {
+    position: 'absolute',
+    width: 6,
+    height: 6,
+    borderRadius: 3,
+  },
+  iconCalendarSvgWrap: {
+    width: 22,
+    height: 20,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  iconTasks: {
+    width: 22,
+    height: 20,
+    justifyContent: 'space-between',
+    paddingVertical: 1,
+  },
+  iconTasksRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+  },
+  iconTasksBullet: {
+    width: 5,
+    height: 5,
+    borderRadius: 2.5,
+    borderWidth: 1.5,
+  },
+  iconTasksLine: {
+    flex: 1,
+    height: 2,
+    borderRadius: 999,
+  },
+  iconBell: {
+    width: 22,
+    height: 22,
+    alignItems: 'center',
+    justifyContent: 'flex-end',
+  },
+  iconBellBody: {
+    width: 16,
+    height: 14,
+    borderWidth: 2,
+    borderTopLeftRadius: 8,
+    borderTopRightRadius: 8,
+    borderBottomLeftRadius: 6,
+    borderBottomRightRadius: 6,
+  },
+  iconBellClapper: {
+    position: 'absolute',
+    bottom: 4,
+    width: 4,
+    height: 4,
+    borderRadius: 2,
+  },
+  iconBellBase: {
+    width: 10,
+    height: 2,
+    borderRadius: 999,
+    marginTop: 2,
+  },
+});
+
+function BottomTabIcon({
+  tab,
+  selected,
+  theme,
+}: {
+  tab: AppTab;
+  selected: boolean;
+  theme: AppTheme;
+}) {
+  const stroke = selected ? theme.colors.iconSelected : theme.colors.iconUnselected;
+  const fill = selected ? theme.colors.iconSelected : theme.colors.iconUnselected;
 
   if (tab === 'today') {
     return (
-      <View style={styles.iconToday}>
-        <View style={[styles.iconTodayRing, { borderColor: stroke }]} />
-        <View style={[styles.iconTodayDot, { backgroundColor: fill }]} />
+      <View style={iconStyles.iconToday}>
+        <View style={[iconStyles.iconTodayRing, { borderColor: stroke }]} />
+        <View style={[iconStyles.iconTodayDot, { backgroundColor: fill }]} />
       </View>
     );
   }
 
   if (tab === 'calendar') {
     return (
-      <View style={styles.iconCalendarSvgWrap}>
+      <View style={iconStyles.iconCalendarSvgWrap}>
         <Svg width={20} height={20} viewBox="0 -960 960 960">
           <Path
             d="M200-80q-33 0-56.5-23.5T120-160v-560q0-33 23.5-56.5T200-800h40v-80h80v80h320v-80h80v80h40q33 0 56.5 23.5T840-720v560q0 33-23.5 56.5T760-80H200Zm0-80h560v-400H200v400Zm0-480h560v-80H200v80Zm0 0v-80 80Zm280 240q-17 0-28.5-11.5T440-440q0-17 11.5-28.5T480-480q17 0 28.5 11.5T520-440q0 17-11.5 28.5T480-400Zm-188.5-11.5Q280-423 280-440t11.5-28.5Q303-480 320-480t28.5 11.5Q360-457 360-440t-11.5 28.5Q337-400 320-400t-28.5-11.5ZM640-400q-17 0-28.5-11.5T600-440q0-17 11.5-28.5T640-480q17 0 28.5 11.5T680-440q0 17-11.5 28.5T640-400ZM480-240q-17 0-28.5-11.5T440-280q0-17 11.5-28.5T480-320q17 0 28.5 11.5T520-280q0 17-11.5 28.5T480-240Zm-188.5-11.5Q280-263 280-280t11.5-28.5Q303-320 320-320t28.5 11.5Q360-297 360-280t-11.5 28.5Q337-240 320-240t-28.5-11.5ZM640-240q-17 0-28.5-11.5T600-280q0-17 11.5-28.5T640-320q17 0 28.5 11.5T680-280q0 17-11.5 28.5T640-240Z"
-            fill={selected ? '#f59e0b' : '#9ca3af'}
+            fill={selected ? theme.colors.iconSelected : theme.colors.iconUnselected}
           />
         </Svg>
       </View>
@@ -109,11 +196,11 @@ function BottomTabIcon({ tab, selected }: { tab: AppTab; selected: boolean }) {
 
   if (tab === 'tasks') {
     return (
-      <View style={styles.iconTasks}>
+      <View style={iconStyles.iconTasks}>
         {[0, 1, 2].map((index) => (
-          <View key={index} style={styles.iconTasksRow}>
-            <View style={[styles.iconTasksBullet, { borderColor: stroke }]} />
-            <View style={[styles.iconTasksLine, { backgroundColor: stroke }]} />
+          <View key={index} style={iconStyles.iconTasksRow}>
+            <View style={[iconStyles.iconTasksBullet, { borderColor: stroke }]} />
+            <View style={[iconStyles.iconTasksLine, { backgroundColor: stroke }]} />
           </View>
         ))}
       </View>
@@ -121,17 +208,49 @@ function BottomTabIcon({ tab, selected }: { tab: AppTab; selected: boolean }) {
   }
 
   return (
-    <View style={styles.iconBell}>
-      <View style={[styles.iconBellBody, { borderColor: stroke }]} />
-      <View style={[styles.iconBellClapper, { backgroundColor: fill }]} />
-      <View style={[styles.iconBellBase, { backgroundColor: stroke }]} />
+    <View style={iconStyles.iconBell}>
+      <View style={[iconStyles.iconBellBody, { borderColor: stroke }]} />
+      <View style={[iconStyles.iconBellClapper, { backgroundColor: fill }]} />
+      <View style={[iconStyles.iconBellBase, { backgroundColor: stroke }]} />
     </View>
   );
 }
 
-function getCalendarCompletionTone(completionRate: number) {
+function getCalendarCompletionTone(theme: AppTheme, completionRate: number) {
   if (completionRate <= 0) {
     return null;
+  }
+
+  if (theme.name === 'light') {
+    if (completionRate < 0.3) {
+      return {
+        backgroundColor: '#fff7ed',
+        borderColor: '#fdba74',
+        dayColor: '#9a3412',
+      };
+    }
+
+    if (completionRate < 0.7) {
+      return {
+        backgroundColor: '#ecfccb',
+        borderColor: '#84cc16',
+        dayColor: '#3f6212',
+      };
+    }
+
+    if (completionRate < 1) {
+      return {
+        backgroundColor: '#dcfce7',
+        borderColor: '#4ade80',
+        dayColor: '#166534',
+      };
+    }
+
+    return {
+      backgroundColor: '#bbf7d0',
+      borderColor: '#22c55e',
+      dayColor: '#14532d',
+    };
   }
 
   if (completionRate < 0.3) {
@@ -166,6 +285,9 @@ function getCalendarCompletionTone(completionRate: number) {
 }
 
 export default function App() {
+  const colorScheme = useColorScheme();
+  const theme = getAppTheme(colorScheme);
+  const styles = createStyles(theme);
   const scrollViewRef = useRef<ScrollView | null>(null);
   const [activeTab, setActiveTab] = useState<AppTab>('today');
   const [showTaskHelp, setShowTaskHelp] = useState(false);
@@ -672,7 +794,7 @@ export default function App() {
             <View style={styles.heroBar}>
               <View style={styles.heroBarTitleRow}>
                 <View style={styles.heroBarIconWrap}>
-                  <BottomTabIcon tab={activeTab} selected />
+                  <BottomTabIcon tab={activeTab} selected theme={theme} />
                 </View>
                 <Text style={styles.heroBarTitle}>{heroContent[activeTab].title}</Text>
               </View>
@@ -738,12 +860,13 @@ export default function App() {
           <View style={styles.panel}>
             <Text style={styles.caption}>{`${today} (${getWeekdayLabel(today)})`}</Text>
             {loadingTasks ? (
-              <ActivityIndicator color="#f59e0b" />
+              <ActivityIndicator color={theme.colors.activityIndicator} />
             ) : (
               // 오늘 탭은 reminder 종료시간까지 함께 보여준다.
               todayItems.map((item) => (
                 <TaskItemCard
                   key={item.task.id}
+                  theme={theme}
                   item={item}
                   actionLabel={getStatusActionLabel(
                     item,
@@ -904,7 +1027,7 @@ export default function App() {
                   const isToday = dateKey === today;
                   const doneCount = dayItems.filter((item) => item.status === 'DONE').length;
                   const completionRate = dayItems.length > 0 ? doneCount / dayItems.length : 0;
-                  const completionTone = getCalendarCompletionTone(completionRate);
+                  const completionTone = getCalendarCompletionTone(theme, completionRate);
 
                   return (
                     <Pressable
@@ -940,6 +1063,7 @@ export default function App() {
               {filteredSelectedItems.map((item) => (
                 <TaskItemCard
                   key={item.ticket.id}
+                  theme={theme}
                   item={item}
                   actionLabel={getStatusActionLabel(
                     item,
@@ -1050,7 +1174,7 @@ export default function App() {
               ) : null}
               <TextInput
                 placeholder="예: 퇴근 체크"
-                placeholderTextColor="#6b7280"
+                placeholderTextColor={theme.colors.placeholder}
                 style={styles.input}
                 value={title}
                 onChangeText={setTitle}
@@ -1204,7 +1328,7 @@ export default function App() {
                     value={ruleMessage}
                     onChangeText={setRuleMessage}
                     placeholder="예: 체크해주세요"
-                    placeholderTextColor="#6b7280"
+                    placeholderTextColor={theme.colors.placeholder}
                     returnKeyType="done"
                     onFocus={() => {
                       requestAnimationFrame(() => {
@@ -1334,7 +1458,7 @@ export default function App() {
               ]}
               onPress={() => setActiveTab(tab.key)}
             >
-              <BottomTabIcon tab={tab.key} selected={selected} />
+              <BottomTabIcon tab={tab.key} selected={selected} theme={theme} />
               <Text
                 style={[
                   styles.tabButtonText,
@@ -1352,10 +1476,10 @@ export default function App() {
   );
 }
 
-const styles = StyleSheet.create({
+const createStyles = (theme: AppTheme) => StyleSheet.create({
   screen: {
     flex: 1,
-    backgroundColor: '#0b1220',
+    backgroundColor: theme.colors.screen,
   },
   content: {
     paddingHorizontal: 14,
@@ -1369,9 +1493,9 @@ const styles = StyleSheet.create({
     paddingTop: 14,
     paddingBottom: 16,
     gap: 10,
-    backgroundColor: '#111827',
+    backgroundColor: theme.colors.heroBackground,
     borderBottomWidth: 1,
-    borderBottomColor: '#1f2937',
+    borderBottomColor: theme.colors.heroBorder,
   },
   heroBar: {
     flexDirection: 'row',
@@ -1388,25 +1512,25 @@ const styles = StyleSheet.create({
     width: 30,
     height: 30,
     borderRadius: 10,
-    backgroundColor: '#182131',
+    backgroundColor: theme.colors.heroIconBackground,
     borderWidth: 1,
-    borderColor: '#293548',
+    borderColor: theme.colors.heroIconBorder,
     alignItems: 'center',
     justifyContent: 'center',
   },
   eyebrow: {
-    color: '#94a3b8',
+    color: theme.colors.textSoft,
     fontSize: 11,
     fontWeight: '700',
   },
   heroBarTitle: {
-    color: '#f9fafb',
+    color: theme.colors.textPrimary,
     fontSize: 18,
     fontWeight: '800',
     lineHeight: 22,
   },
   subtitle: {
-    color: '#d1d5db',
+    color: theme.colors.textSecondary,
     fontSize: 13,
     lineHeight: 18,
   },
@@ -1417,53 +1541,53 @@ const styles = StyleSheet.create({
   },
   heroStatCard: {
     flex: 1,
-    backgroundColor: '#182131',
+    backgroundColor: theme.colors.heroStatBackground,
     borderRadius: 18,
     borderWidth: 1,
-    borderColor: '#293548',
+    borderColor: theme.colors.heroStatBorder,
     paddingHorizontal: 14,
     paddingVertical: 14,
     gap: 4,
   },
   heroStatCardPending: {
-    backgroundColor: '#182538',
-    borderColor: '#334155',
+    backgroundColor: theme.colors.heroStatPendingBackground,
+    borderColor: theme.colors.heroStatPendingBorder,
   },
   heroStatCardInProgress: {
-    backgroundColor: '#2b1d0f',
-    borderColor: '#92400e',
+    backgroundColor: theme.colors.heroStatInProgressBackground,
+    borderColor: theme.colors.heroStatInProgressBorder,
   },
   heroStatCardDone: {
-    backgroundColor: '#11261f',
-    borderColor: '#166534',
+    backgroundColor: theme.colors.heroStatDoneBackground,
+    borderColor: theme.colors.heroStatDoneBorder,
   },
   heroStatLabel: {
-    color: '#9ca3af',
+    color: theme.colors.textMuted,
     fontSize: 12,
     fontWeight: '700',
   },
   heroStatLabelPending: {
-    color: '#cbd5e1',
+    color: theme.colors.textSecondary,
   },
   heroStatLabelInProgress: {
-    color: '#fcd34d',
+    color: theme.colors.inProgressBadgeText,
   },
   heroStatLabelDone: {
-    color: '#86efac',
+    color: theme.colors.doneBadgeText,
   },
   heroStatValue: {
-    color: '#f9fafb',
+    color: theme.colors.textPrimary,
     fontSize: 20,
     fontWeight: '800',
   },
   heroStatValuePending: {
-    color: '#f8fafc',
+    color: theme.colors.textPrimary,
   },
   heroStatValueInProgress: {
-    color: '#fef3c7',
+    color: theme.colors.inProgressBadgeText,
   },
   heroStatValueDone: {
-    color: '#dcfce7',
+    color: theme.colors.doneBadgeText,
   },
   tabRow: {
     flexDirection: 'row',
@@ -1472,8 +1596,8 @@ const styles = StyleSheet.create({
     paddingTop: 10,
     paddingBottom: 14,
     borderTopWidth: 1,
-    borderTopColor: '#202b3c',
-    backgroundColor: '#0f1728',
+    borderTopColor: theme.colors.tabBarBorder,
+    backgroundColor: theme.colors.tabBarBackground,
   },
   tabButton: {
     flex: 1,
@@ -1484,7 +1608,7 @@ const styles = StyleSheet.create({
     gap: 6,
   },
   tabButtonActive: {
-    backgroundColor: '#1f2937',
+    backgroundColor: theme.colors.tabButtonActive,
   },
   tabButtonInactive: {
     backgroundColor: 'transparent',
@@ -1494,10 +1618,10 @@ const styles = StyleSheet.create({
     fontWeight: '800',
   },
   tabButtonTextActive: {
-    color: '#f9fafb',
+    color: theme.colors.textPrimary,
   },
   tabButtonTextInactive: {
-    color: '#9ca3af',
+    color: theme.colors.tabTextInactive,
   },
   iconToday: {
     width: 22,
@@ -1577,7 +1701,7 @@ const styles = StyleSheet.create({
     gap: 14,
   },
   panelTitle: {
-    color: '#f9fafb',
+    color: theme.colors.textPrimary,
     fontSize: 22,
     fontWeight: '800',
   },
@@ -1588,13 +1712,13 @@ const styles = StyleSheet.create({
     gap: 12,
   },
   sectionEyebrow: {
-    color: '#cbd5e1',
+    color: theme.colors.textSecondary,
     fontSize: 13,
     fontWeight: '800',
     letterSpacing: 0.6,
   },
   sectionMeta: {
-    color: '#64748b',
+    color: theme.colors.textMuted,
     fontSize: 12,
     fontWeight: '700',
   },
@@ -1604,12 +1728,12 @@ const styles = StyleSheet.create({
     gap: 16,
   },
   label: {
-    color: '#9ca3af',
+    color: theme.colors.textMuted,
     fontSize: 14,
     fontWeight: '600',
   },
   value: {
-    color: '#e5e7eb',
+    color: theme.colors.textSecondary,
     fontSize: 14,
     fontWeight: '600',
     flexShrink: 1,
@@ -1617,13 +1741,13 @@ const styles = StyleSheet.create({
   },
   button: {
     marginTop: 4,
-    backgroundColor: '#f59e0b',
+    backgroundColor: theme.colors.accent,
     borderRadius: 14,
     paddingVertical: 12,
     paddingHorizontal: 14,
   },
   buttonText: {
-    color: '#111827',
+    color: theme.colors.accentText,
     fontSize: 15,
     fontWeight: '800',
     textAlign: 'center',
@@ -1631,33 +1755,33 @@ const styles = StyleSheet.create({
   buttonFlex: {
     flex: 1,
     marginTop: 4,
-    backgroundColor: '#f59e0b',
+    backgroundColor: theme.colors.accent,
     borderRadius: 14,
     paddingVertical: 12,
     paddingHorizontal: 14,
   },
   secondaryButton: {
     marginTop: 4,
-    backgroundColor: '#111827',
+    backgroundColor: theme.colors.secondaryButtonBackground,
     borderRadius: 14,
     borderWidth: 1,
-    borderColor: '#374151',
+    borderColor: theme.colors.secondaryButtonBorder,
     paddingVertical: 12,
     paddingHorizontal: 16,
   },
   secondaryButtonText: {
-    color: '#e5e7eb',
+    color: theme.colors.secondaryButtonText,
     fontSize: 15,
     fontWeight: '800',
     textAlign: 'center',
   },
   item: {
-    color: '#e5e7eb',
+    color: theme.colors.textSecondary,
     fontSize: 15,
     lineHeight: 22,
   },
   caption: {
-    color: '#9ca3af',
+    color: theme.colors.textMuted,
     fontSize: 13,
     fontWeight: '600',
   },
@@ -1671,27 +1795,27 @@ const styles = StyleSheet.create({
     gap: 12,
   },
   taskCategoryBadge: {
-    backgroundColor: '#2d3748',
+    backgroundColor: theme.colors.categoryBackground,
     borderRadius: 999,
     paddingHorizontal: 10,
     paddingVertical: 4,
     borderWidth: 1,
-    borderColor: '#4b5563',
+    borderColor: theme.colors.borderMuted,
     alignSelf: 'flex-start',
   },
   taskCategory: {
-    color: '#f59e0b',
+    color: theme.colors.categoryText,
     fontSize: 12,
     fontWeight: '700',
   },
   taskTitle: {
-    color: '#f9fafb',
+    color: theme.colors.textPrimary,
     fontSize: 18,
     fontWeight: '700',
     flex: 1,
   },
   taskRepeat: {
-    color: '#9ca3af',
+    color: theme.colors.textMuted,
     fontSize: 13,
   },
   statusBadge: {
@@ -1706,25 +1830,25 @@ const styles = StyleSheet.create({
     fontWeight: '800',
   },
   statusBadgePending: {
-    backgroundColor: '#172554',
-    borderColor: '#2563eb',
+    backgroundColor: theme.colors.pendingBadgeBackground,
+    borderColor: theme.colors.pendingBadgeBorder,
   },
   statusBadgePendingText: {
-    color: '#bfdbfe',
+    color: theme.colors.pendingBadgeText,
   },
   statusBadgeInProgress: {
-    backgroundColor: '#451a03',
-    borderColor: '#f59e0b',
+    backgroundColor: theme.colors.inProgressBadgeBackground,
+    borderColor: theme.colors.inProgressBadgeBorder,
   },
   statusBadgeInProgressText: {
-    color: '#fde68a',
+    color: theme.colors.inProgressBadgeText,
   },
   statusBadgeDone: {
-    backgroundColor: '#052e16',
-    borderColor: '#10b981',
+    backgroundColor: theme.colors.doneBadgeBackground,
+    borderColor: theme.colors.doneBadgeBorder,
   },
   statusBadgeDoneText: {
-    color: '#a7f3d0',
+    color: theme.colors.doneBadgeText,
   },
   statusButton: {
     borderRadius: 12,
@@ -1732,31 +1856,31 @@ const styles = StyleSheet.create({
     paddingHorizontal: 14,
   },
   statusPending: {
-    backgroundColor: '#2563eb',
+    backgroundColor: theme.colors.pendingButtonBackground,
   },
   statusDone: {
-    backgroundColor: '#059669',
+    backgroundColor: theme.colors.doneButtonBackground,
   },
   statusInProgress: {
-    backgroundColor: '#b45309',
+    backgroundColor: theme.colors.inProgressButtonBackground,
   },
   deleteButton: {
-    backgroundColor: '#7f1d1d',
+    backgroundColor: theme.colors.destructiveBackground,
   },
   editButton: {
-    backgroundColor: '#374151',
+    backgroundColor: theme.colors.editButtonBackground,
   },
   flexButton: {
     flex: 1,
   },
   statusButtonText: {
-    color: '#f9fafb',
+    color: theme.colors.textPrimary,
     textAlign: 'center',
     fontSize: 14,
     fontWeight: '800',
   },
   emptyText: {
-    color: '#9ca3af',
+    color: theme.colors.textMuted,
     fontSize: 14,
   },
   calendarHeader: {
@@ -1773,20 +1897,20 @@ const styles = StyleSheet.create({
   monthButton: {
     width: 42,
     height: 42,
-    backgroundColor: '#121b2a',
+    backgroundColor: theme.colors.monthButtonBackground,
     borderRadius: 12,
     borderWidth: 1,
-    borderColor: '#2a3648',
+    borderColor: theme.colors.monthButtonBorder,
     alignItems: 'center',
     justifyContent: 'center',
   },
   monthButtonText: {
-    color: '#e5e7eb',
+    color: theme.colors.textSecondary,
     fontSize: 13,
     fontWeight: '700',
   },
   monthButtonIcon: {
-    color: '#f8fafc',
+    color: theme.colors.textPrimary,
     fontSize: 26,
     lineHeight: 28,
     fontWeight: '500',
@@ -1798,18 +1922,18 @@ const styles = StyleSheet.create({
   },
   segmentedControl: {
     flexDirection: 'row',
-    backgroundColor: '#121b2a',
+    backgroundColor: theme.colors.inputBackground,
     borderRadius: 999,
     borderWidth: 1,
-    borderColor: '#2a3648',
+    borderColor: theme.colors.monthButtonBorder,
     padding: 4,
   },
   segmentedControlWide: {
     flexDirection: 'row',
-    backgroundColor: '#121b2a',
+    backgroundColor: theme.colors.inputBackground,
     borderRadius: 14,
     borderWidth: 1,
-    borderColor: '#2a3648',
+    borderColor: theme.colors.monthButtonBorder,
     padding: 3,
   },
   segmentedItem: {
@@ -1825,23 +1949,23 @@ const styles = StyleSheet.create({
     paddingVertical: 7,
   },
   segmentedItemActive: {
-    backgroundColor: '#f59e0b',
+    backgroundColor: theme.colors.accent,
   },
   segmentedText: {
     fontSize: 11,
     fontWeight: '800',
   },
   segmentedTextActive: {
-    color: '#111827',
+    color: theme.colors.accentText,
   },
   segmentedTextInactive: {
-    color: '#d1d5db',
+    color: theme.colors.textSecondary,
   },
   todayPill: {
-    backgroundColor: '#121b2a',
+    backgroundColor: theme.colors.todayPillBackground,
     borderRadius: 999,
     borderWidth: 1,
-    borderColor: '#2a3648',
+    borderColor: theme.colors.todayPillBorder,
     paddingHorizontal: 12,
     paddingVertical: 7,
   },
@@ -1851,7 +1975,7 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
   },
   todayPillText: {
-    color: '#e5e7eb',
+    color: theme.colors.textSecondary,
     fontSize: 12,
     fontWeight: '800',
   },
@@ -1861,7 +1985,7 @@ const styles = StyleSheet.create({
   },
   weekHeaderText: {
     width: '14.28%',
-    color: '#9ca3af',
+    color: theme.colors.textMuted,
     fontSize: 12,
     fontWeight: '700',
     textAlign: 'center',
@@ -1872,10 +1996,10 @@ const styles = StyleSheet.create({
   },
   calendarCell: {
     minHeight: 84,
-    backgroundColor: '#141d2d',
+    backgroundColor: theme.colors.calendarCellBackground,
     borderRadius: 16,
     borderWidth: 1,
-    borderColor: '#2b3648',
+    borderColor: theme.colors.calendarCellBorder,
     paddingVertical: 8,
     paddingHorizontal: 4,
     alignItems: 'center',
@@ -1889,36 +2013,36 @@ const styles = StyleSheet.create({
     opacity: 0.45,
   },
   calendarCellSelected: {
-    borderColor: '#d97706',
+    borderColor: theme.colors.calendarSelectedBorder,
     borderWidth: 2,
   },
   calendarTodayCell: {
-    borderColor: '#fbbf24',
+    borderColor: theme.colors.calendarTodayBorder,
     borderWidth: 2,
   },
   calendarDay: {
-    color: '#f9fafb',
+    color: theme.colors.textPrimary,
     fontSize: 14,
     fontWeight: '800',
   },
   calendarTextMuted: {
-    color: '#6b7280',
+    color: theme.colors.calendarMutedText,
   },
   calendarToday: {
     textDecorationLine: 'underline',
   },
   input: {
-    backgroundColor: '#121b2a',
+    backgroundColor: theme.colors.inputBackground,
     borderRadius: 16,
     borderWidth: 1,
-    borderColor: '#2b3648',
-    color: '#f9fafb',
+    borderColor: theme.colors.border,
+    color: theme.colors.textPrimary,
     fontSize: 15,
     paddingHorizontal: 14,
     paddingVertical: 12,
   },
   fieldLabel: {
-    color: '#d1d5db',
+    color: theme.colors.textSecondary,
     fontSize: 13,
     fontWeight: '700',
   },
@@ -1952,7 +2076,7 @@ const styles = StyleSheet.create({
     gap: 4,
   },
   filterLabel: {
-    color: '#9ca3af',
+    color: theme.colors.textMuted,
     fontSize: 11,
     fontWeight: '700',
   },
@@ -1968,38 +2092,38 @@ const styles = StyleSheet.create({
     paddingVertical: 6,
   },
   filterChipActive: {
-    backgroundColor: '#f59e0b',
-    borderColor: '#f59e0b',
+    backgroundColor: theme.colors.accent,
+    borderColor: theme.colors.accent,
   },
   filterChipInactive: {
-    backgroundColor: '#111827',
-    borderColor: '#374151',
+    backgroundColor: theme.colors.filterChipInactiveBackground,
+    borderColor: theme.colors.filterChipInactiveBorder,
   },
   filterChipText: {
     fontSize: 11,
     fontWeight: '700',
   },
   filterChipTextActive: {
-    color: '#111827',
+    color: theme.colors.accentText,
   },
   filterChipTextInactive: {
-    color: '#e5e7eb',
+    color: theme.colors.textSecondary,
   },
   filterResetButton: {
     paddingHorizontal: 9,
     paddingVertical: 5,
     borderRadius: 999,
     borderWidth: 1,
-    borderColor: '#4b5563',
-    backgroundColor: '#111827',
+    borderColor: theme.colors.filterResetBorder,
+    backgroundColor: theme.colors.filterResetBackground,
   },
   filterResetButtonText: {
-    color: '#e5e7eb',
+    color: theme.colors.textSecondary,
     fontSize: 11,
     fontWeight: '700',
   },
   compactFieldLabel: {
-    color: '#d1d5db',
+    color: theme.colors.textSecondary,
     fontSize: 12,
     fontWeight: '700',
   },
@@ -2018,25 +2142,25 @@ const styles = StyleSheet.create({
     paddingVertical: 8,
   },
   chipActive: {
-    backgroundColor: '#f59e0b',
-    borderColor: '#f59e0b',
+    backgroundColor: theme.colors.accent,
+    borderColor: theme.colors.accent,
   },
   chipInactive: {
-    backgroundColor: '#111827',
-    borderColor: '#374151',
+    backgroundColor: theme.colors.chipBackground,
+    borderColor: theme.colors.chipBorder,
   },
   chipText: {
     fontSize: 13,
     fontWeight: '700',
   },
   chipTextActive: {
-    color: '#111827',
+    color: theme.colors.accentText,
   },
   chipTextInactive: {
-    color: '#e5e7eb',
+    color: theme.colors.textSecondary,
   },
   formMessage: {
-    color: '#d1d5db',
+    color: theme.colors.textSecondary,
     fontSize: 13,
   },
   helpToggle: {
@@ -2044,7 +2168,7 @@ const styles = StyleSheet.create({
     paddingVertical: 4,
   },
   helpToggleText: {
-    color: '#fbbf24',
+    color: theme.colors.accent,
     fontSize: 13,
     fontWeight: '700',
   },
@@ -2052,39 +2176,39 @@ const styles = StyleSheet.create({
     gap: 10,
   },
   ruleCard: {
-    backgroundColor: '#141d2d',
+    backgroundColor: theme.colors.cardBackground,
     borderRadius: 18,
     borderWidth: 1,
-    borderColor: '#2b3648',
+    borderColor: theme.colors.border,
     padding: 16,
     gap: 12,
   },
   helperCard: {
-    backgroundColor: '#141d2d',
+    backgroundColor: theme.colors.helperBackground,
     borderRadius: 18,
     borderWidth: 1,
-    borderColor: '#2b3648',
+    borderColor: theme.colors.border,
     padding: 16,
     gap: 6,
   },
   confirmModalCard: {
-    backgroundColor: '#1f2937',
+    backgroundColor: theme.colors.modalBackground,
     borderRadius: 20,
     padding: 18,
     gap: 14,
     borderWidth: 1,
-    borderColor: '#374151',
+    borderColor: theme.colors.modalBorder,
   },
   modalActionButton: {
     marginTop: 0,
   },
   helperTitle: {
-    color: '#f9fafb',
+    color: theme.colors.textPrimary,
     fontSize: 14,
     fontWeight: '700',
   },
   helperText: {
-    color: '#d1d5db',
+    color: theme.colors.textSecondary,
     fontSize: 13,
     lineHeight: 20,
   },
@@ -2093,44 +2217,44 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'space-between',
     gap: 12,
-    backgroundColor: '#141d2d',
+    backgroundColor: theme.colors.permissionBackground,
     borderRadius: 18,
     borderWidth: 1,
-    borderColor: '#2b3648',
+    borderColor: theme.colors.border,
     paddingHorizontal: 14,
     paddingVertical: 12,
   },
   permissionText: {
     flex: 1,
-    color: '#d1d5db',
+    color: theme.colors.textSecondary,
     fontSize: 13,
     lineHeight: 18,
   },
   permissionButton: {
     borderRadius: 999,
-    backgroundColor: '#f59e0b',
+    backgroundColor: theme.colors.accent,
     paddingHorizontal: 12,
     paddingVertical: 8,
   },
   permissionButtonText: {
-    color: '#111827',
+    color: theme.colors.accentText,
     fontSize: 12,
     fontWeight: '800',
   },
   modalBackdrop: {
     flex: 1,
-    backgroundColor: 'rgba(17, 24, 39, 0.72)',
+    backgroundColor: theme.colors.modalBackdrop,
     justifyContent: 'center',
     padding: 20,
   },
   modalCard: {
     maxHeight: '75%',
-    backgroundColor: '#1f2937',
+    backgroundColor: theme.colors.modalBackground,
     borderRadius: 20,
     padding: 18,
     gap: 12,
     borderWidth: 1,
-    borderColor: '#374151',
+    borderColor: theme.colors.modalBorder,
   },
   monthPickerYearToolbar: {
     flexDirection: 'row',
@@ -2148,10 +2272,10 @@ const styles = StyleSheet.create({
   },
   monthPickerCell: {
     width: '22%',
-    backgroundColor: '#111827',
+    backgroundColor: theme.colors.surfaceStrong,
     borderRadius: 12,
     borderWidth: 1,
-    borderColor: '#374151',
+    borderColor: theme.colors.secondaryButtonBorder,
     paddingVertical: 10,
     alignItems: 'center',
   },
