@@ -10,6 +10,7 @@ type TaskItemCardProps = {
   item: TodayTaskItem;
   actionLabel: string;
   onPress: () => void;
+  onDeletePress?: () => void;
   checkedAtLabel?: string | null;
   reminderEndAtLabel?: string | null;
 };
@@ -18,6 +19,7 @@ export function TaskItemCard({
   item,
   actionLabel,
   onPress,
+  onDeletePress,
   checkedAtLabel,
   reminderEndAtLabel,
 }: TaskItemCardProps) {
@@ -26,54 +28,68 @@ export function TaskItemCard({
 
   return (
     <View style={styles.taskCard}>
+      {onDeletePress ? (
+        <Pressable
+          style={styles.deleteIconButton}
+          onPress={onDeletePress}
+          hitSlop={10}
+          pressRetentionOffset={10}
+        >
+          <Text style={styles.deleteIconText}>X</Text>
+        </Pressable>
+      ) : null}
       <View style={styles.taskMeta}>
-        <View style={styles.taskHeaderRow}>
-          <Text style={styles.taskTitle}>{item.task.title}</Text>
+        <View style={styles.taskBadgeRow}>
+          <View
+            style={[
+              styles.statusBadge,
+              tone === 'done'
+                ? styles.statusBadgeDone
+                : tone === 'inProgress'
+                  ? styles.statusBadgeInProgress
+                  : styles.statusBadgePending,
+            ]}
+          >
+            <Text
+              style={[
+                styles.statusBadgeText,
+                tone === 'done'
+                  ? styles.statusBadgeDoneText
+                  : tone === 'inProgress'
+                    ? styles.statusBadgeInProgressText
+                    : styles.statusBadgePendingText,
+              ]}
+            >
+              {getTaskStatusLabel(item.status)}
+            </Text>
+          </View>
           <View style={styles.taskCategoryBadge}>
             <Text style={styles.taskCategory}>{item.task.category}</Text>
           </View>
         </View>
-        <View
-          style={[
-            styles.statusBadge,
-            tone === 'done'
-              ? styles.statusBadgeDone
-              : tone === 'inProgress'
-                ? styles.statusBadgeInProgress
-                : styles.statusBadgePending,
-          ]}
-        >
-          <Text
-            style={[
-              styles.statusBadgeText,
-              tone === 'done'
-                ? styles.statusBadgeDoneText
-                : tone === 'inProgress'
-                  ? styles.statusBadgeInProgressText
-                  : styles.statusBadgePendingText,
-            ]}
-          >
-            {getTaskStatusLabel(item.status)}
-          </Text>
+        <View style={styles.taskHeaderRow}>
+          <Text style={styles.taskTitle}>{item.task.title}</Text>
         </View>
         {checkedAtLabel ? <Text style={styles.taskRepeat}>완료시간: {checkedAtLabel}</Text> : null}
         {reminderEndAtLabel ? (
           <Text style={styles.taskRepeat}>알림 종료시간: {reminderEndAtLabel}</Text>
         ) : null}
       </View>
-      <Pressable
-        style={[
-          styles.statusButton,
-          item.status === 'DONE'
-            ? styles.statusDone
-            : item.status === 'IN_PROGRESS'
-              ? styles.statusInProgress
-              : styles.statusPending,
-        ]}
-        onPress={onPress}
-      >
-        <Text style={styles.statusButtonText}>{actionLabel}</Text>
-      </Pressable>
+      <View style={styles.actionColumn}>
+        <Pressable
+          style={[
+            styles.statusButton,
+            item.status === 'DONE'
+              ? styles.statusDone
+              : item.status === 'IN_PROGRESS'
+                ? styles.statusInProgress
+                : styles.statusPending,
+          ]}
+          onPress={onPress}
+        >
+          <Text style={styles.statusButtonText}>{actionLabel}</Text>
+        </Pressable>
+      </View>
     </View>
   );
 }
@@ -87,17 +103,22 @@ const styles = StyleSheet.create({
     borderColor: '#243041',
     backgroundColor: '#101826',
     padding: 16,
-    alignItems: 'center',
+    alignItems: 'flex-start',
+    position: 'relative',
   },
   taskMeta: {
     flex: 1,
     gap: 8,
   },
+  taskBadgeRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+  },
   taskHeaderRow: {
     flexDirection: 'row',
-    justifyContent: 'space-between',
     gap: 10,
-    alignItems: 'center',
+    alignItems: 'flex-start',
   },
   taskTitle: {
     flex: 1,
@@ -154,6 +175,14 @@ const styles = StyleSheet.create({
     paddingVertical: 14,
     alignItems: 'center',
     justifyContent: 'center',
+    alignSelf: 'center',
+  },
+  actionColumn: {
+    gap: 8,
+    alignItems: 'center',
+    justifyContent: 'center',
+    alignSelf: 'stretch',
+    paddingRight: 12,
   },
   statusPending: {
     backgroundColor: '#f59e0b',
@@ -166,6 +195,25 @@ const styles = StyleSheet.create({
   },
   statusButtonText: {
     color: '#ffffff',
+    fontWeight: '700',
+  },
+  deleteIconButton: {
+    position: 'absolute',
+    top: 10,
+    right: 10,
+    width: 28,
+    height: 28,
+    borderRadius: 14,
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderWidth: 1,
+    borderColor: '#5b2333',
+    backgroundColor: '#25131a',
+    zIndex: 2,
+  },
+  deleteIconText: {
+    color: '#fca5a5',
+    fontSize: 12,
     fontWeight: '700',
   },
 });

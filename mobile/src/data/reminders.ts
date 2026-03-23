@@ -7,6 +7,7 @@ type CreateReminderRuleInput = {
   delayMinutes: number;
   message: string;
   repeatIntervalMinutes?: number | null;
+  maxAlertCount: number;
 };
 
 function mapRowToReminderRule(row: any): ReminderRule {
@@ -16,6 +17,7 @@ function mapRowToReminderRule(row: any): ReminderRule {
     delayMinutes: row.delay_minutes,
     message: row.message,
     repeatIntervalMinutes: row.repeat_interval_minutes,
+    maxAlertCount: row.max_alert_count,
     isActive: Boolean(row.is_active),
     createdAt: row.created_at,
     updatedAt: row.updated_at,
@@ -49,6 +51,7 @@ export async function createReminderRule(input: CreateReminderRuleInput) {
     delayMinutes: input.delayMinutes,
     message: input.message.trim(),
     repeatIntervalMinutes: input.repeatIntervalMinutes ?? null,
+    maxAlertCount: input.maxAlertCount,
     isActive: true,
     createdAt: now,
     updatedAt: now,
@@ -62,10 +65,11 @@ export async function createReminderRule(input: CreateReminderRuleInput) {
         delay_minutes,
         message,
         repeat_interval_minutes,
+        max_alert_count,
         is_active,
         created_at,
         updated_at
-      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
     `,
     [
       rule.id,
@@ -73,6 +77,7 @@ export async function createReminderRule(input: CreateReminderRuleInput) {
       rule.delayMinutes,
       rule.message,
       rule.repeatIntervalMinutes ?? null,
+      rule.maxAlertCount,
       1,
       rule.createdAt,
       rule.updatedAt,

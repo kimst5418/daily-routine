@@ -7,7 +7,6 @@ import {
 } from '../../data/reminder-events';
 import type { ReminderEvent, ReminderRule, TaskTicketStatus } from '../../domain/types';
 import {
-  calculateRepeatUntil,
   cancelScheduledNotification,
   scheduleReminderNotification,
 } from '../../lib/notifications';
@@ -69,7 +68,7 @@ export async function scheduleReminderEventsForTaskStart(input: {
       taskTicketId: input.taskTicketId,
       scheduledAt,
       repeatIntervalMinutes: rule.repeatIntervalMinutes ?? null,
-      repeatUntil: calculateRepeatUntil(input.openedAt, rule.delayMinutes),
+      maxAlertCount: rule.maxAlertCount,
       notificationRequestId,
     });
   }
@@ -123,11 +122,14 @@ export async function rescheduleDueReminderEvents() {
     // 앱이 다시 열렸을 때도 "지금 시각 이후의 다음 반복 시점"으로 밀어준다.
     const rule = ruleMap.get(event.ruleId);
     const intervalMinutes = event.repeatIntervalMinutes ?? rule?.repeatIntervalMinutes ?? null;
+    const nextSentCount = (event.sentCount ?? 0) + 1;
+    const maxAlertCount = event.maxAlertCount ?? rule?.maxAlertCount ?? null;
 
     if (!rule || !intervalMinutes || intervalMinutes <= 0) {
       await completeReminderEventCycle({
         eventId: event.id,
         sentAt: nowIso,
+        sentCount: nextSentCount,
       });
       continue;
     }
@@ -137,10 +139,11 @@ export async function rescheduleDueReminderEvents() {
       nextScheduledAt = addMinutes(nextScheduledAt, intervalMinutes);
     }
 
-    if (event.repeatUntil && nextScheduledAt > event.repeatUntil) {
+    if (maxAlertCount && nextSentCount >= maxAlertCount) {
       await completeReminderEventCycle({
         eventId: event.id,
         sentAt: nowIso,
+        sentCount: nextSentCount,
       });
       continue;
     }
@@ -154,6 +157,7 @@ export async function rescheduleDueReminderEvents() {
     await completeReminderEventCycle({
       eventId: event.id,
       sentAt: nowIso,
+      sentCount: nextSentCount,
       nextScheduledAt,
       notificationRequestId,
     });

@@ -1,5 +1,4 @@
 import * as SQLite from 'expo-sqlite';
-import { addMinutes } from '../lib/time';
 
 let dbPromise: Promise<SQLite.SQLiteDatabase> | null = null;
 
@@ -44,6 +43,7 @@ export async function initializeDatabase() {
       recurrence_rule_id TEXT NOT NULL,
       task_date TEXT NOT NULL,
       status TEXT NOT NULL,
+      dismissed_at TEXT,
       opened_at TEXT,
       completed_at TEXT,
       created_at TEXT NOT NULL,
@@ -57,6 +57,7 @@ export async function initializeDatabase() {
       delay_minutes INTEGER NOT NULL DEFAULT 60,
       message TEXT NOT NULL,
       repeat_interval_minutes INTEGER,
+      max_alert_count INTEGER NOT NULL DEFAULT 5,
       is_active INTEGER NOT NULL DEFAULT 1,
       created_at TEXT NOT NULL,
       updated_at TEXT NOT NULL
@@ -70,31 +71,45 @@ export async function initializeDatabase() {
       sent_at TEXT,
       status TEXT NOT NULL,
       repeat_interval_minutes INTEGER,
-      repeat_until TEXT,
+      max_alert_count INTEGER,
+      sent_count INTEGER NOT NULL DEFAULT 0,
       completed_at TEXT,
       notification_request_id TEXT
     );
   `);
 
-  const pendingReminderEvents = await db.getAllAsync<{
-    id: string;
-    scheduled_at: string;
-  }>(
-    `
-      SELECT id, scheduled_at
-      FROM reminder_events
-      WHERE status = 'PENDING'
-    `
-  );
-
-  for (const event of pendingReminderEvents) {
-    await db.runAsync(
-      `
-        UPDATE reminder_events
-        SET repeat_until = ?
-        WHERE id = ?
-      `,
-      [addMinutes(event.scheduled_at, 24 * 60), event.id]
-    );
+  const taskTicketColumns = await db.getAllAsync<{ name: string }>('PRAGMA table_info(task_tickets)');
+  if (!taskTicketColumns.some((column) => column.name === 'dismissed_at')) {
+    await db.execAsync(`
+      ALTER TABLE task_tickets
+      ADD COLUMN dismissed_at TEXT;
+    `);
   }
+
+  const reminderRuleColumns = await db.getAllAsync<{ name: string }>(
+    'PRAGMA table_info(reminder_rules)'
+  );
+  if (!reminderRuleColumns.some((column) => column.name === 'max_alert_count')) {
+    await db.execAsync(`
+      ALTER TABLE reminder_rules
+      ADD COLUMN max_alert_count INTEGER NOT NULL DEFAULT 5;
+    `);
+  }
+
+  const reminderEventColumns = await db.getAllAsync<{ name: string }>(
+    'PRAGMA table_info(reminder_events)'
+  );
+  if (!reminderEventColumns.some((column) => column.name === 'max_alert_count')) {
+    await db.execAsync(`
+      ALTER TABLE reminder_events
+      ADD COLUMN max_alert_count INTEGER;
+    `);
+  }
+  if (!reminderEventColumns.some((column) => column.name === 'sent_count')) {
+    await db.execAsync(`
+      ALTER TABLE reminder_events
+      ADD COLUMN sent_count INTEGER NOT NULL DEFAULT 0;
+    `);
+  }
+
 }

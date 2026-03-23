@@ -55,6 +55,7 @@ const taskItemSelectColumns = `
   tt.id AS ticket_id,
   tt.task_date,
   tt.status AS ticket_status,
+  tt.dismissed_at,
   tt.opened_at,
   tt.completed_at,
   tt.created_at AS ticket_created_at,
@@ -84,6 +85,7 @@ function mapRowToTicket(row: any): TaskTicket {
     recurrenceRuleId: row.recurrence_rule_id,
     taskDate: row.task_date,
     status: row.ticket_status,
+    dismissedAt: row.dismissed_at,
     openedAt: row.opened_at,
     completedAt: row.completed_at,
     createdAt: row.ticket_created_at,
@@ -267,40 +269,6 @@ export async function ensureTodayTaskTickets(dateKey: string) {
   }
 }
 
-export async function seedSampleTasks(today: string) {
-  const existing = await listTasks();
-  if (existing.length > 0) {
-    await ensureTodayTaskTickets(today);
-    return existing;
-  }
-
-  await createTask({
-    title: '출근 체크',
-    category: '생활',
-    repeatType: 'WEEKLY_DAYS',
-    repeatDays: [1, 2, 3, 4, 5],
-    startDate: today,
-  });
-
-  await createTask({
-    title: '운동 30분',
-    category: '운동',
-    repeatType: 'DAILY',
-    startDate: today,
-  });
-
-  await createTask({
-    title: '영어 공부',
-    category: '공부',
-    repeatType: 'WEEKLY_DAYS',
-    repeatDays: [1, 3, 5],
-    startDate: today,
-  });
-
-  await ensureTodayTaskTickets(today);
-  return listTasks();
-}
-
 function sortItems(left: TodayTaskItem, right: TodayTaskItem) {
   if (left.status !== right.status) {
     const order: Record<TaskTicketStatus, number> = {
@@ -321,12 +289,12 @@ export async function getTaskItemsForDate(dateKey: string): Promise<TodayTaskIte
     `
       SELECT
         ${taskItemSelectColumns},
-        MAX(CASE WHEN re.status = 'PENDING' THEN re.repeat_until ELSE NULL END) AS reminder_end_at
+        NULL AS reminder_end_at
       FROM task_tickets tt
       INNER JOIN task_templates t ON t.id = tt.template_id
       INNER JOIN recurrence_rules r ON r.id = tt.recurrence_rule_id
       LEFT JOIN reminder_events re ON re.task_ticket_id = tt.id
-      WHERE tt.task_date = ?
+      WHERE tt.task_date = ? AND tt.dismissed_at IS NULL
       GROUP BY tt.id
       ORDER BY tt.status ASC, t.title ASC
     `,
@@ -353,7 +321,7 @@ export async function getTaskItemsForDates(dateKeys: string[]) {
       FROM task_tickets tt
       INNER JOIN task_templates t ON t.id = tt.template_id
       INNER JOIN recurrence_rules r ON r.id = tt.recurrence_rule_id
-      WHERE tt.task_date >= ? AND tt.task_date <= ?
+      WHERE tt.task_date >= ? AND tt.task_date <= ? AND tt.dismissed_at IS NULL
       ORDER BY tt.task_date ASC, tt.status ASC, t.title ASC
     `,
     [startDate, endDate]
@@ -387,7 +355,7 @@ export async function getMonthCompletionSummaries(
     `
       SELECT task_date, status
       FROM task_tickets
-      WHERE task_date >= ? AND task_date <= ?
+      WHERE task_date >= ? AND task_date <= ? AND dismissed_at IS NULL
       ORDER BY task_date ASC
     `,
     [monthStart, monthEnd]
@@ -446,6 +414,20 @@ export async function setTaskStatus(ticketId: string, status: TaskTicketStatus) 
     openedAt,
     completedAt,
   };
+}
+
+export async function dismissTaskTicket(ticketId: string) {
+  const db = await getDatabase();
+  const now = new Date().toISOString();
+
+  await db.runAsync(
+    `
+      UPDATE task_tickets
+      SET dismissed_at = ?, updated_at = ?
+      WHERE id = ?
+    `,
+    [now, now, ticketId]
+  );
 }
 
 export const getTodayTaskItems = getTaskItemsForDate;

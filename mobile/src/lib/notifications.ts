@@ -1,6 +1,4 @@
 import Constants from 'expo-constants';
-import { addMinutes } from './time';
-
 export function isExpoGo() {
   return Constants.executionEnvironment === 'storeClient';
 }
@@ -88,12 +86,42 @@ export async function ensureNotificationPermissions() {
   return Notifications.requestPermissionsAsync();
 }
 
+export async function getNotificationPermissions() {
+  if (isExpoGo()) {
+    return {
+      granted: false,
+      canAskAgain: false,
+      expires: 'never',
+      status: 'denied',
+    };
+  }
+
+  const Notifications = await getNotificationsModule();
+
+  if (!Notifications) {
+    return {
+      granted: false,
+      canAskAgain: false,
+      expires: 'never',
+      status: 'denied',
+    };
+  }
+
+  await ensureDefaultChannel();
+  return Notifications.getPermissionsAsync();
+}
+
 export async function scheduleReminderNotification(input: {
   title: string;
   body: string;
   scheduledAt: string;
 }) {
   if (isExpoGo()) {
+    return null;
+  }
+
+  const permission = await ensureNotificationPermissions();
+  if (!permission.granted) {
     return null;
   }
 
@@ -134,8 +162,4 @@ export async function cancelScheduledNotification(notificationRequestId: string)
   }
 
   await Notifications.cancelScheduledNotificationAsync(notificationRequestId);
-}
-
-export function calculateRepeatUntil(triggeredAt: string, delayMinutes: number) {
-  return addMinutes(triggeredAt, delayMinutes + 24 * 60);
 }

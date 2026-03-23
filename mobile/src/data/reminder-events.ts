@@ -7,7 +7,7 @@ type CreateReminderEventInput = {
   taskTicketId: string;
   scheduledAt: string;
   repeatIntervalMinutes?: number | null;
-  repeatUntil?: string | null;
+  maxAlertCount?: number | null;
   notificationRequestId?: string | null;
 };
 
@@ -20,7 +20,8 @@ function mapRowToReminderEvent(row: any): ReminderEvent {
     sentAt: row.sent_at,
     status: row.status,
     repeatIntervalMinutes: row.repeat_interval_minutes,
-    repeatUntil: row.repeat_until,
+    maxAlertCount: row.max_alert_count,
+    sentCount: row.sent_count ?? 0,
     completedAt: row.completed_at,
     notificationRequestId: row.notification_request_id,
   };
@@ -60,7 +61,8 @@ export async function createReminderEvent(input: CreateReminderEventInput) {
     sentAt: null,
     status: 'PENDING',
     repeatIntervalMinutes: input.repeatIntervalMinutes ?? null,
-    repeatUntil: input.repeatUntil ?? null,
+    maxAlertCount: input.maxAlertCount ?? null,
+    sentCount: 0,
     completedAt: null,
     notificationRequestId: input.notificationRequestId ?? null,
   };
@@ -75,10 +77,11 @@ export async function createReminderEvent(input: CreateReminderEventInput) {
         sent_at,
         status,
         repeat_interval_minutes,
-        repeat_until,
+        max_alert_count,
+        sent_count,
         completed_at,
         notification_request_id
-      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
     `,
     [
       event.id,
@@ -88,7 +91,8 @@ export async function createReminderEvent(input: CreateReminderEventInput) {
       event.sentAt ?? null,
       event.status,
       event.repeatIntervalMinutes ?? null,
-      event.repeatUntil ?? null,
+      event.maxAlertCount ?? null,
+      event.sentCount,
       event.completedAt ?? null,
       event.notificationRequestId ?? null,
     ]
@@ -123,6 +127,7 @@ export async function dismissReminderEvent(eventId: string) {
 export async function completeReminderEventCycle(input: {
   eventId: string;
   sentAt: string;
+  sentCount: number;
   nextScheduledAt?: string | null;
   notificationRequestId?: string | null;
 }) {
@@ -132,11 +137,12 @@ export async function completeReminderEventCycle(input: {
     await db.runAsync(
       `
         UPDATE reminder_events
-        SET sent_at = ?, scheduled_at = ?, notification_request_id = ?, status = 'PENDING'
+        SET sent_at = ?, sent_count = ?, scheduled_at = ?, notification_request_id = ?, status = 'PENDING'
         WHERE id = ? AND status = 'PENDING'
       `,
       [
         input.sentAt,
+        input.sentCount,
         input.nextScheduledAt,
         input.notificationRequestId ?? null,
         input.eventId,
@@ -148,10 +154,10 @@ export async function completeReminderEventCycle(input: {
   await db.runAsync(
     `
       UPDATE reminder_events
-      SET sent_at = ?, notification_request_id = NULL, status = 'EXPIRED'
+      SET sent_at = ?, sent_count = ?, notification_request_id = NULL, status = 'EXPIRED'
       WHERE id = ? AND status = 'PENDING'
     `,
-    [input.sentAt, input.eventId]
+    [input.sentAt, input.sentCount, input.eventId]
   );
 }
 

@@ -47,6 +47,7 @@ export type TaskTicket = {
   recurrenceRuleId: string;
   taskDate: string;
   status: TaskTicketStatus;
+  dismissedAt?: string | null;
   openedAt?: string | null;
   completedAt?: string | null;
   createdAt: string;
@@ -59,6 +60,7 @@ export type ReminderRule = {
   delayMinutes: number;
   message: string;
   repeatIntervalMinutes?: number | null;
+  maxAlertCount: number;
   isActive: boolean;
   createdAt: string;
   updatedAt: string;
@@ -72,7 +74,8 @@ export type ReminderEvent = {
   sentAt?: string | null;
   status: ReminderEventStatus;
   repeatIntervalMinutes?: number | null;
-  repeatUntil?: string | null;
+  maxAlertCount?: number | null;
+  sentCount: number;
   completedAt?: string | null;
   notificationRequestId?: string | null;
 };
