@@ -44,7 +44,6 @@ import type {
 } from './src/domain/types';
 import {
   addDays,
-  buildWeekGrid,
   buildMonthGrid,
   fromDateKey,
   getMonthLabel,
@@ -81,7 +80,6 @@ import {
 } from './src/features/tasks/task-presentation';
 
 type AppTab = (typeof tabs)[number]['key'];
-type CalendarViewMode = 'MONTH' | 'WEEK';
 
 function BottomTabIcon({ tab, selected }: { tab: AppTab; selected: boolean }) {
   const stroke = selected ? '#f59e0b' : '#9ca3af';
@@ -185,7 +183,6 @@ export default function App() {
   const [savingTask, setSavingTask] = useState(false);
   const [selectedDate, setSelectedDate] = useState(toDateKey(new Date()));
   const [visibleMonth, setVisibleMonth] = useState(getMonthStart(toDateKey(new Date())));
-  const [calendarViewMode, setCalendarViewMode] = useState<CalendarViewMode>('MONTH');
   const [calendarStatusFilter, setCalendarStatusFilter] = useState<CalendarStatusFilter>('ALL');
   const [calendarCategoryFilter, setCalendarCategoryFilter] = useState<'ALL' | TaskCategory>('ALL');
   const [showMonthPicker, setShowMonthPicker] = useState(false);
@@ -212,22 +209,8 @@ export default function App() {
   const activeCalendarFilterCount =
     (calendarStatusFilter === 'ALL' ? 0 : 1) + (calendarCategoryFilter === 'ALL' ? 0 : 1);
   const monthGrid = buildMonthGrid(visibleMonth);
-  const weekGrid = buildWeekGrid(selectedDate);
-  const calendarGrid = calendarViewMode === 'MONTH' ? monthGrid : weekGrid;
-  const weekStart = weekGrid[0];
-  const weekEnd = weekGrid[weekGrid.length - 1];
-  const weekStartDate = fromDateKey(weekStart);
-  const weekEndDate = fromDateKey(weekEnd);
-  const visibleCalendarLabel =
-    calendarViewMode === 'MONTH'
-      ? getMonthLabel(visibleMonth)
-      : weekStartDate.getFullYear() === weekEndDate.getFullYear()
-        ? `${weekStartDate.getFullYear()}년 ${weekStartDate.getMonth() + 1}/${weekStartDate.getDate()} - ${
-            weekEndDate.getMonth() + 1
-          }/${weekEndDate.getDate()}`
-        : `${weekStartDate.getFullYear()}년 ${weekStartDate.getMonth() + 1}/${weekStartDate.getDate()} - ${
-            weekEndDate.getFullYear()
-          }년 ${weekEndDate.getMonth() + 1}/${weekEndDate.getDate()}`;
+  const calendarGrid = monthGrid;
+  const visibleCalendarLabel = getMonthLabel(visibleMonth);
   const filteredSelectedItems = filterTaskItems(
     selectedItems,
     calendarStatusFilter,
@@ -288,19 +271,10 @@ export default function App() {
   }
 
   function moveCalendar(amount: number) {
-    if (calendarViewMode === 'MONTH') {
-      const nextMonth = shiftMonth(visibleMonth, amount);
-      const nextSelectedDate = nextMonth;
-
-      setVisibleMonth(nextMonth);
-      void handleSelectDate(nextSelectedDate, nextMonth);
-      return;
-    }
-
-    const nextDate = addDays(selectedDate, amount * 7);
-    const nextMonth = getMonthStart(nextDate);
+    const nextMonth = shiftMonth(visibleMonth, amount);
+    const nextSelectedDate = nextMonth;
     setVisibleMonth(nextMonth);
-    void handleSelectDate(nextDate, nextMonth);
+    void handleSelectDate(nextSelectedDate, nextMonth);
   }
 
   function jumpToToday() {
@@ -314,9 +288,7 @@ export default function App() {
   }
 
   function openMonthPicker() {
-    setMonthPickerYear(
-      fromDateKey(calendarViewMode === 'MONTH' ? visibleMonth : selectedDate).getFullYear()
-    );
+    setMonthPickerYear(fromDateKey(visibleMonth).getFullYear());
     setShowMonthPicker(true);
   }
 
@@ -695,70 +667,72 @@ export default function App() {
         contentContainerStyle={styles.content}
         keyboardShouldPersistTaps="handled"
       >
-        <View style={styles.hero}>
-          <View style={styles.heroBar}>
-            <View style={styles.heroBarTitleRow}>
-              <View style={styles.heroBarIconWrap}>
-                <BottomTabIcon tab={activeTab} selected />
+        {activeTab !== 'calendar' ? (
+          <View style={styles.hero}>
+            <View style={styles.heroBar}>
+              <View style={styles.heroBarTitleRow}>
+                <View style={styles.heroBarIconWrap}>
+                  <BottomTabIcon tab={activeTab} selected />
+                </View>
+                <Text style={styles.heroBarTitle}>{heroContent[activeTab].title}</Text>
               </View>
-              <Text style={styles.heroBarTitle}>{heroContent[activeTab].title}</Text>
+              {heroContent[activeTab].eyebrow ? (
+                <Text style={styles.eyebrow}>{heroContent[activeTab].eyebrow}</Text>
+              ) : null}
             </View>
-            {heroContent[activeTab].eyebrow ? (
-              <Text style={styles.eyebrow}>{heroContent[activeTab].eyebrow}</Text>
+            {heroContent[activeTab].subtitle ? (
+              <Text style={styles.subtitle}>{heroContent[activeTab].subtitle}</Text>
+            ) : null}
+            {activeTab === 'today' && heroContent.today.stats ? (
+              <View style={styles.heroStatsRow}>
+                {heroContent.today.stats.map((stat) => (
+                  <View
+                    key={stat.label}
+                    style={[
+                      styles.heroStatCard,
+                      stat.tone === 'pending'
+                        ? styles.heroStatCardPending
+                        : stat.tone === 'inProgress'
+                          ? styles.heroStatCardInProgress
+                          : stat.tone === 'done'
+                            ? styles.heroStatCardDone
+                            : null,
+                    ]}
+                  >
+                    <Text
+                      style={[
+                        styles.heroStatLabel,
+                        stat.tone === 'pending'
+                          ? styles.heroStatLabelPending
+                          : stat.tone === 'inProgress'
+                            ? styles.heroStatLabelInProgress
+                            : stat.tone === 'done'
+                              ? styles.heroStatLabelDone
+                              : null,
+                      ]}
+                    >
+                      {stat.label}
+                    </Text>
+                    <Text
+                      style={[
+                        styles.heroStatValue,
+                        stat.tone === 'pending'
+                          ? styles.heroStatValuePending
+                          : stat.tone === 'inProgress'
+                            ? styles.heroStatValueInProgress
+                            : stat.tone === 'done'
+                              ? styles.heroStatValueDone
+                              : null,
+                      ]}
+                    >
+                      {stat.value}
+                    </Text>
+                  </View>
+                ))}
+              </View>
             ) : null}
           </View>
-          {heroContent[activeTab].subtitle ? (
-            <Text style={styles.subtitle}>{heroContent[activeTab].subtitle}</Text>
-          ) : null}
-          {activeTab === 'today' && heroContent.today.stats ? (
-            <View style={styles.heroStatsRow}>
-              {heroContent.today.stats.map((stat) => (
-                <View
-                  key={stat.label}
-                  style={[
-                    styles.heroStatCard,
-                    stat.tone === 'pending'
-                      ? styles.heroStatCardPending
-                      : stat.tone === 'inProgress'
-                        ? styles.heroStatCardInProgress
-                        : stat.tone === 'done'
-                          ? styles.heroStatCardDone
-                          : null,
-                  ]}
-                >
-                  <Text
-                    style={[
-                      styles.heroStatLabel,
-                      stat.tone === 'pending'
-                        ? styles.heroStatLabelPending
-                        : stat.tone === 'inProgress'
-                          ? styles.heroStatLabelInProgress
-                          : stat.tone === 'done'
-                            ? styles.heroStatLabelDone
-                            : null,
-                    ]}
-                  >
-                    {stat.label}
-                  </Text>
-                  <Text
-                    style={[
-                      styles.heroStatValue,
-                      stat.tone === 'pending'
-                        ? styles.heroStatValuePending
-                        : stat.tone === 'inProgress'
-                          ? styles.heroStatValueInProgress
-                          : stat.tone === 'done'
-                            ? styles.heroStatValueDone
-                            : null,
-                    ]}
-                  >
-                    {stat.value}
-                  </Text>
-                </View>
-              ))}
-            </View>
-          ) : null}
-        </View>
+        ) : null}
 
         {activeTab === 'today' ? (
           <View style={styles.panel}>
@@ -817,74 +791,35 @@ export default function App() {
             <View style={styles.panel}>
               <View style={styles.calendarHeader}>
                 <Pressable style={styles.monthButton} onPress={() => moveCalendar(-1)}>
-                  <Text style={styles.monthButtonText}>이전</Text>
+                  <Text style={styles.monthButtonIcon}>‹</Text>
                 </Pressable>
                 <Pressable style={styles.calendarTitleButton} onPress={openMonthPicker}>
                   <Text style={styles.panelTitle}>{visibleCalendarLabel}</Text>
                 </Pressable>
-                <Pressable style={styles.monthButton} onPress={() => moveCalendar(1)}>
-                  <Text style={styles.monthButtonText}>다음</Text>
-                </Pressable>
-              </View>
-
-              <View style={styles.calendarToolbar}>
-                <View style={styles.segmentedControl}>
+                <View style={styles.calendarHeaderActions}>
                   <Pressable
-                    style={[
-                      styles.segmentedItem,
-                      calendarViewMode === 'MONTH' && styles.segmentedItemActive,
-                    ]}
-                    onPress={() => setCalendarViewMode('MONTH')}
+                    style={styles.monthButton}
+                    onPress={() => moveCalendar(1)}
                   >
-                    <Text
-                      style={[
-                        styles.segmentedText,
-                        calendarViewMode === 'MONTH'
-                          ? styles.segmentedTextActive
-                          : styles.segmentedTextInactive,
-                      ]}
-                    >
-                      월
-                    </Text>
+                    <Text style={styles.monthButtonIcon}>›</Text>
                   </Pressable>
                   <Pressable
-                    style={[
-                      styles.segmentedItem,
-                      calendarViewMode === 'WEEK' && styles.segmentedItemActive,
-                    ]}
-                    onPress={() => setCalendarViewMode('WEEK')}
+                    style={[styles.todayPill, styles.todayPillCompact]}
+                    onPress={jumpToToday}
                   >
-                    <Text
-                      style={[
-                        styles.segmentedText,
-                        calendarViewMode === 'WEEK'
-                          ? styles.segmentedTextActive
-                          : styles.segmentedTextInactive,
-                      ]}
-                    >
-                      주
-                    </Text>
+                    <Text style={styles.todayPillText}>오늘</Text>
                   </Pressable>
                 </View>
-                <Pressable style={styles.todayPill} onPress={jumpToToday}>
-                  <Text style={styles.todayPillText}>오늘</Text>
-                </Pressable>
               </View>
 
               <View style={styles.filterSection}>
                 <View style={styles.filterSummaryRow}>
-                  <Text style={styles.fieldLabel}>달력 필터</Text>
                   {activeCalendarFilterCount > 0 ? (
                     <Pressable style={styles.filterResetButton} onPress={resetCalendarFilters}>
                       <Text style={styles.filterResetButtonText}>필터 초기화</Text>
                     </Pressable>
                   ) : null}
                 </View>
-                <Text style={styles.caption}>
-                  {activeCalendarFilterCount > 0
-                    ? `${activeCalendarFilterCount}개 필터가 적용되어 있습니다.`
-                    : '필요할 때만 상태나 카테고리로 좁혀 보세요.'}
-                </Text>
                 <View style={styles.filterBlock}>
                   <Text style={styles.filterLabel}>상태</Text>
                   <View style={styles.segmentedControlWide}>
@@ -954,10 +889,7 @@ export default function App() {
               </View>
 
               <View
-                style={[
-                  styles.calendarGrid,
-                  calendarViewMode === 'WEEK' && styles.calendarGridWeek,
-                ]}
+                style={styles.calendarGrid}
                 {...calendarPanResponder.panHandlers}
               >
                 {calendarGrid.map((dateKey) => {
@@ -979,9 +911,8 @@ export default function App() {
                       key={dateKey}
                       style={[
                         styles.calendarCell,
-                        calendarViewMode === 'MONTH' && styles.calendarCellMonth,
-                        calendarViewMode === 'WEEK' && styles.calendarCellWeek,
-                        calendarViewMode === 'MONTH' && !inCurrentMonth && styles.calendarCellMuted,
+                        styles.calendarCellMonth,
+                        !inCurrentMonth && styles.calendarCellMuted,
                         completionTone,
                         selected && styles.calendarCellSelected,
                         isToday && styles.calendarTodayCell,
@@ -991,7 +922,7 @@ export default function App() {
                       <Text
                         style={[
                           styles.calendarDay,
-                          calendarViewMode === 'MONTH' && !inCurrentMonth && styles.calendarTextMuted,
+                          !inCurrentMonth && styles.calendarTextMuted,
                           completionTone && !selected && { color: completionTone.dayColor },
                           isToday && styles.calendarToday,
                         ]}
@@ -1834,27 +1765,36 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
     gap: 12,
   },
+  calendarHeaderActions: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+  },
   monthButton: {
-    backgroundColor: '#111827',
+    width: 42,
+    height: 42,
+    backgroundColor: '#121b2a',
     borderRadius: 12,
     borderWidth: 1,
-    borderColor: '#374151',
-    paddingVertical: 8,
-    paddingHorizontal: 12,
+    borderColor: '#2a3648',
+    alignItems: 'center',
+    justifyContent: 'center',
   },
   monthButtonText: {
     color: '#e5e7eb',
     fontSize: 13,
     fontWeight: '700',
   },
-  calendarTitleButton: {
-    alignItems: 'center',
+  monthButtonIcon: {
+    color: '#f8fafc',
+    fontSize: 26,
+    lineHeight: 28,
+    fontWeight: '500',
+    marginTop: -2,
   },
-  calendarToolbar: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
+  calendarTitleButton: {
+    flex: 1,
     alignItems: 'center',
-    gap: 12,
   },
   segmentedControl: {
     flexDirection: 'row',
@@ -1867,10 +1807,10 @@ const styles = StyleSheet.create({
   segmentedControlWide: {
     flexDirection: 'row',
     backgroundColor: '#121b2a',
-    borderRadius: 16,
+    borderRadius: 14,
     borderWidth: 1,
     borderColor: '#2a3648',
-    padding: 4,
+    padding: 3,
   },
   segmentedItem: {
     borderRadius: 999,
@@ -1881,14 +1821,14 @@ const styles = StyleSheet.create({
     flex: 1,
     borderRadius: 10,
     alignItems: 'center',
-    paddingHorizontal: 10,
-    paddingVertical: 8,
+    paddingHorizontal: 8,
+    paddingVertical: 7,
   },
   segmentedItemActive: {
     backgroundColor: '#f59e0b',
   },
   segmentedText: {
-    fontSize: 12,
+    fontSize: 11,
     fontWeight: '800',
   },
   segmentedTextActive: {
@@ -1904,6 +1844,11 @@ const styles = StyleSheet.create({
     borderColor: '#2a3648',
     paddingHorizontal: 12,
     paddingVertical: 7,
+  },
+  todayPillCompact: {
+    paddingHorizontal: 11,
+    minHeight: 42,
+    justifyContent: 'center',
   },
   todayPillText: {
     color: '#e5e7eb',
@@ -1925,11 +1870,6 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     flexWrap: 'wrap',
   },
-  calendarGridWeek: {
-    flexWrap: 'nowrap',
-    justifyContent: 'space-between',
-    gap: 0,
-  },
   calendarCell: {
     minHeight: 84,
     backgroundColor: '#141d2d',
@@ -1944,15 +1884,6 @@ const styles = StyleSheet.create({
   calendarCellMonth: {
     width: '14.285%',
     marginBottom: 6,
-  },
-  calendarCellWeek: {
-    flexGrow: 0,
-    flexShrink: 0,
-    width: '13.4%',
-    minHeight: 118,
-    alignItems: 'flex-start',
-    paddingHorizontal: 6,
-    paddingVertical: 10,
   },
   calendarCellMuted: {
     opacity: 0.45,
@@ -2009,32 +1940,32 @@ const styles = StyleSheet.create({
     gap: 10,
   },
   filterSection: {
-    gap: 8,
+    gap: 6,
   },
   filterSummaryRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    justifyContent: 'space-between',
+    justifyContent: 'flex-end',
     gap: 12,
   },
   filterBlock: {
-    gap: 6,
+    gap: 4,
   },
   filterLabel: {
     color: '#9ca3af',
-    fontSize: 12,
+    fontSize: 11,
     fontWeight: '700',
   },
   filterChipRow: {
     flexDirection: 'row',
     flexWrap: 'wrap',
-    gap: 8,
+    gap: 6,
   },
   filterChip: {
     borderRadius: 999,
     borderWidth: 1,
-    paddingHorizontal: 10,
-    paddingVertical: 7,
+    paddingHorizontal: 9,
+    paddingVertical: 6,
   },
   filterChipActive: {
     backgroundColor: '#f59e0b',
@@ -2045,7 +1976,7 @@ const styles = StyleSheet.create({
     borderColor: '#374151',
   },
   filterChipText: {
-    fontSize: 12,
+    fontSize: 11,
     fontWeight: '700',
   },
   filterChipTextActive: {
@@ -2055,8 +1986,8 @@ const styles = StyleSheet.create({
     color: '#e5e7eb',
   },
   filterResetButton: {
-    paddingHorizontal: 10,
-    paddingVertical: 6,
+    paddingHorizontal: 9,
+    paddingVertical: 5,
     borderRadius: 999,
     borderWidth: 1,
     borderColor: '#4b5563',
@@ -2064,7 +1995,7 @@ const styles = StyleSheet.create({
   },
   filterResetButtonText: {
     color: '#e5e7eb',
-    fontSize: 12,
+    fontSize: 11,
     fontWeight: '700',
   },
   compactFieldLabel: {
