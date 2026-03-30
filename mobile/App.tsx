@@ -520,6 +520,14 @@ export default function App() {
     }
   }
 
+  function handleTabPress(nextTab: AppTab) {
+    if (activeTab !== nextTab) {
+      scrollViewRef.current?.scrollTo({ y: 0, animated: false });
+    }
+
+    setActiveTab(nextTab);
+  }
+
   async function handleSelectMonth(year: number, monthIndex: number) {
     const date = new Date(year, monthIndex, 1);
     const nextMonth = toDateKey(date);
@@ -1699,7 +1707,7 @@ export default function App() {
                 styles.tabButton,
                 selected ? styles.tabButtonActive : styles.tabButtonInactive,
               ]}
-              onPress={() => setActiveTab(tab.key)}
+              onPress={() => handleTabPress(tab.key)}
             >
               <BottomTabIcon tab={tab.key} selected={selected} theme={theme} />
               <Text
