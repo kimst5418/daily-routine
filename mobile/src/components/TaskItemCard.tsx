@@ -14,6 +14,7 @@ type TaskItemCardProps = {
   secondaryActionLabel?: string | null;
   onSecondaryPress?: () => void;
   onDeletePress?: () => void;
+  timeSummaryLabel?: string | null;
   openedAtLabel?: string | null;
   checkedAtLabel?: string | null;
   reminderEndAtLabel?: string | null;
@@ -27,6 +28,7 @@ export function TaskItemCard({
   secondaryActionLabel,
   onSecondaryPress,
   onDeletePress,
+  timeSummaryLabel,
   openedAtLabel,
   checkedAtLabel,
   reminderEndAtLabel,
@@ -93,6 +95,7 @@ export function TaskItemCard({
         <View style={styles.taskHeaderRow}>
           <Text style={styles.taskTitle}>{item.task.title}</Text>
         </View>
+        {timeSummaryLabel ? <Text style={styles.taskRepeat}>{timeSummaryLabel}</Text> : null}
         {openedAtLabel ? <Text style={styles.taskRepeat}>시작시간: {openedAtLabel}</Text> : null}
         {checkedAtLabel ? <Text style={styles.taskRepeat}>완료시간: {checkedAtLabel}</Text> : null}
         {reminderEndAtLabel ? (

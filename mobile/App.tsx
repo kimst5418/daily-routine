@@ -19,6 +19,10 @@ import {
 
 import { initializeDatabase } from './src/data/database';
 import {
+  getThemePreference,
+  setThemePreferenceSetting,
+} from './src/data/settings';
+import {
   createTask,
   deactivateTask,
   deleteTaskTicket,
@@ -468,6 +472,16 @@ export default function App() {
     setMonthPickerYear((prev) => prev + amount);
   }
 
+  async function handleThemePreferencePress(nextPreference: ThemePreference) {
+    setThemePreference(nextPreference);
+
+    try {
+      await setThemePreferenceSetting(nextPreference);
+    } catch {
+      setSettingsMessage('테마 설정을 저장하지 못했습니다.');
+    }
+  }
+
   async function handleSelectMonth(year: number, monthIndex: number) {
     const date = new Date(year, monthIndex, 1);
     const nextMonth = toDateKey(date);
@@ -484,6 +498,7 @@ export default function App() {
     async function bootstrap() {
       try {
         await initializeDatabase();
+        const savedThemePreference = await getThemePreference();
         await ensureTodayTaskTickets(today);
 
         const [items, itemsByDate] = await Promise.all([
@@ -499,6 +514,7 @@ export default function App() {
           return;
         }
 
+        setThemePreference(savedThemePreference);
         setTodayItems(items);
         setSelectedItems(items);
         setCalendarItemsByDate(itemsByDate);
@@ -929,6 +945,20 @@ export default function App() {
             ) : (
               // 오늘 탭은 reminder 종료시간까지 함께 보여준다.
               todayItems.map((item) => (
+                (() => {
+                  const openedAtText = item.ticket.openedAt
+                    ? formatOptionalTime(item.ticket.openedAt)
+                    : null;
+                  const completedAtText =
+                    item.status === 'DONE' ? formatOptionalTime(item.checkedAt) : null;
+                  const timeSummaryLabel =
+                    item.status === 'DONE' && openedAtText && completedAtText
+                      ? `${openedAtText} ~ ${completedAtText}`
+                      : item.status === 'IN_PROGRESS' && openedAtText
+                        ? openedAtText
+                        : null;
+
+                  return (
                 <TaskItemCard
                   key={item.task.id}
                   theme={theme}
@@ -950,12 +980,7 @@ export default function App() {
                           )
                       : undefined
                   }
-                  openedAtLabel={
-                    (item.status === 'IN_PROGRESS' || item.status === 'DONE') && item.ticket.openedAt
-                      ? formatOptionalTime(item.ticket.openedAt)
-                      : null
-                  }
-                  checkedAtLabel={item.status === 'DONE' ? formatOptionalTime(item.checkedAt) : null}
+                  timeSummaryLabel={timeSummaryLabel}
                   onDeletePress={() => setPendingDismissItem(item)}
                   onPress={
                     item.status === 'IN_PROGRESS'
@@ -971,6 +996,8 @@ export default function App() {
                             handleStatusPress(item.ticket.id, item.task.id, item.status, today)
                   }
                 />
+                  );
+                })()
               ))
             )}
             {!loadingTasks && todayItems.length === 0 ? (
@@ -1504,7 +1531,7 @@ export default function App() {
                       styles.segmentedItemFill,
                       themePreference === item && styles.segmentedItemActive,
                     ]}
-                    onPress={() => setThemePreference(item)}
+                    onPress={() => void handleThemePreferencePress(item)}
                   >
                     <Text
                       style={[

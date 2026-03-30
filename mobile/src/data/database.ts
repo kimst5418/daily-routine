@@ -72,6 +72,11 @@ export async function initializeDatabase() {
       max_alert_count INTEGER,
       notification_request_ids TEXT NOT NULL DEFAULT '[]'
     );
+
+    CREATE TABLE IF NOT EXISTS app_settings (
+      key TEXT PRIMARY KEY NOT NULL,
+      value TEXT
+    );
   `);
 
   const taskTicketColumns = await db.getAllAsync<{ name: string }>('PRAGMA table_info(task_tickets)');
