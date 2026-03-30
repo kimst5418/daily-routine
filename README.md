@@ -36,43 +36,48 @@ npm run android
 
 ## APK 생성 방법
 
-이 프로젝트는 [`mobile/eas.json`](/Users/kim/projects/llm/secretary/mobile/eas.json) 에 Android 빌드 프로필이 정의되어 있습니다.
+이 프로젝트의 APK 생성 목표는 `EAS 원격 빌드`가 아니라 `로컬 Android 빌드`입니다.
 
-먼저 `mobile` 디렉터리로 이동합니다.
+### 사전 준비
 
-```bash
-cd mobile
-```
+로컬 APK를 만들려면 아래 환경이 준비되어 있어야 합니다.
 
-### 1. 개발용 APK 생성
+- Android Studio / Android SDK
+- JDK
+- `mobile/node_modules` 설치 완료
 
-개발 클라이언트가 포함된 APK가 필요하면 아래 명령을 사용합니다.
-
-```bash
-eas build -p android --profile development
-```
-
-### 2. 공유/테스트용 APK 생성
-
-내부 테스트나 기기 공유용 APK는 아래 명령을 사용합니다.
+먼저 Android 프로젝트 디렉터리로 이동합니다.
 
 ```bash
-eas build -p android --profile preview
+cd mobile/android
 ```
 
-### 3. 사전 준비
-
-`eas build`를 처음 사용할 때는 아래 준비가 필요할 수 있습니다.
-
+### 1. Debug APK 생성
 ```bash
-npm install -g eas-cli
-eas login
+./gradlew assembleDebug
+```
+- 생성 위치: [`mobile/android/app/build/outputs/apk/debug/app-debug.apk`](/Users/kim/projects/llm/secretary/mobile/android/app/build/outputs/apk/debug/app-debug.apk)
+- APK 최상단으로 이동:
+```bash
+mv /Users/kim/projects/llm/secretary/mobile/android/app/build/outputs/apk/debug/app-debug.apk /Users/kim/projects/llm/secretary/
 ```
 
-빌드가 시작되면 Expo/EAS가 원격으로 Android APK를 생성하고, 완료 후 다운로드 링크를 제공합니다.
+### 2. Release APK 생성
+```bash
+./gradlew assembleRelease
+```
+- 생성 위치: [`mobile/android/app/build/outputs/apk/release/app-release.apk`](/Users/kim/projects/llm/secretary/mobile/android/app/build/outputs/apk/release/app-release.apk)
+- APK 최상단으로 이동:
+```bash
+mv /Users/kim/projects/llm/secretary/mobile/android/app/build/outputs/apk/release/app-release.apk /Users/kim/projects/llm/secretary/
+```
+
+참고:
+
+- 추후 실제 출시를 진행할 때는 `EAS` 사용도 고려할 수 있습니다.
 
 ## 주요 경로
 
 - 앱 코드: [`mobile`](/Users/kim/projects/llm/secretary/mobile)
 - Expo 설정: [`mobile/app.json`](/Users/kim/projects/llm/secretary/mobile/app.json)
-- EAS 빌드 설정: [`mobile/eas.json`](/Users/kim/projects/llm/secretary/mobile/eas.json)
+- Android 빌드 설정: [`mobile/android/app/build.gradle`](/Users/kim/projects/llm/secretary/mobile/android/app/build.gradle)
