@@ -950,6 +950,11 @@ export default function App() {
                           )
                       : undefined
                   }
+                  openedAtLabel={
+                    (item.status === 'IN_PROGRESS' || item.status === 'DONE') && item.ticket.openedAt
+                      ? formatOptionalTime(item.ticket.openedAt)
+                      : null
+                  }
                   checkedAtLabel={item.status === 'DONE' ? formatOptionalTime(item.checkedAt) : null}
                   onDeletePress={() => setPendingDismissItem(item)}
                   onPress={

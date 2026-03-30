@@ -296,9 +296,7 @@ export async function getTaskItemsForDate(dateKey: string): Promise<TodayTaskIte
       FROM task_tickets tt
       INNER JOIN task_templates t ON t.id = tt.template_id
       INNER JOIN recurrence_rules r ON r.id = tt.recurrence_rule_id
-      LEFT JOIN reminder_events re ON re.task_ticket_id = tt.id
       WHERE tt.task_date = ?
-      GROUP BY tt.id
       ORDER BY tt.status ASC, t.title ASC
     `,
     [dateKey]
@@ -389,7 +387,7 @@ export async function getMonthCompletionSummaries(
 export async function setTaskStatus(ticketId: string, status: TaskTicketStatus) {
   const db = await getDatabase();
   const existing = await db.getFirstAsync<any>(
-    'SELECT id, opened_at, completed_at FROM task_tickets WHERE id = ?',
+    'SELECT id, status, opened_at, completed_at FROM task_tickets WHERE id = ?',
     [ticketId]
   );
 
@@ -398,9 +396,13 @@ export async function setTaskStatus(ticketId: string, status: TaskTicketStatus) 
   }
 
   const now = new Date().toISOString();
-  // PENDING 으로 돌아갈 때는 진행/완료 시각을 비우고, 처음 시작할 때만 openedAt 을 채운다.
+  // 시작 시각은 PENDING -> IN_PROGRESS 로 진입할 때만 기록한다.
   const openedAt =
-    status === 'PENDING' ? null : existing.opened_at ?? now;
+    status === 'PENDING'
+      ? null
+      : existing.status === 'PENDING' && status === 'IN_PROGRESS'
+        ? now
+        : (existing.opened_at as string | null);
   const completedAt = status === 'DONE' ? now : null;
 
   await db.runAsync(
