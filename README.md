@@ -1,4 +1,17 @@
-# secretary
+# 루틴 한칸
+
+## 프로젝트 요약
+
+`루틴 한칸`은 반복 루틴을 기록하고, 날짜별 완료 현황을 달력에서 확인하며, 시작 이후 종료 알림 설정 가능한 개인용 앱입니다.
+
+- 앱 위치: [`mobile`](/Users/kim/projects/llm/secretary/mobile)
+- 기술 스택: Expo + React Native + TypeScript + SQLite
+- 현재 범위: Android 우선, 로컬 저장 중심
+- 핵심 기능:
+  - 반복 루틴 생성/수정/삭제
+  - 오늘 탭에서 루틴 상태 변경
+  - 기록 탭 달력 조회
+  - 종료 알림 설정 기능
 
 이 저장소의 실행 대상 앱은 `mobile` 디렉터리에 있는 Expo 기반 모바일 앱입니다.
 
