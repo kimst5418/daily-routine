@@ -472,6 +472,44 @@ export default function App() {
     setMonthPickerYear((prev) => prev + amount);
   }
 
+  function getTaskTimeLabels(item: TodayTaskItem) {
+    const openedAtText = item.ticket.openedAt
+      ? formatOptionalTime(item.ticket.openedAt)
+      : null;
+    const completedAtText =
+      item.status === 'DONE' ? formatOptionalTime(item.checkedAt) : null;
+
+    if (item.status === 'DONE' && openedAtText && completedAtText) {
+      return {
+        timeSummaryLabel: `${openedAtText} ~ ${completedAtText}`,
+        openedAtLabel: null,
+        checkedAtLabel: null,
+      };
+    }
+
+    if (item.status === 'IN_PROGRESS' && openedAtText) {
+      return {
+        timeSummaryLabel: null,
+        openedAtLabel: openedAtText,
+        checkedAtLabel: null,
+      };
+    }
+
+    if (item.status === 'DONE' && completedAtText) {
+      return {
+        timeSummaryLabel: null,
+        openedAtLabel: null,
+        checkedAtLabel: completedAtText,
+      };
+    }
+
+    return {
+      timeSummaryLabel: null,
+      openedAtLabel: null,
+      checkedAtLabel: null,
+    };
+  }
+
   async function handleThemePreferencePress(nextPreference: ThemePreference) {
     setThemePreference(nextPreference);
 
@@ -944,21 +982,10 @@ export default function App() {
               <ActivityIndicator color={theme.colors.activityIndicator} />
             ) : (
               // 오늘 탭은 reminder 종료시간까지 함께 보여준다.
-              todayItems.map((item) => (
-                (() => {
-                  const openedAtText = item.ticket.openedAt
-                    ? formatOptionalTime(item.ticket.openedAt)
-                    : null;
-                  const completedAtText =
-                    item.status === 'DONE' ? formatOptionalTime(item.checkedAt) : null;
-                  const timeSummaryLabel =
-                    item.status === 'DONE' && openedAtText && completedAtText
-                      ? `${openedAtText} ~ ${completedAtText}`
-                      : item.status === 'IN_PROGRESS' && openedAtText
-                        ? openedAtText
-                        : null;
+              todayItems.map((item) => {
+                const timeLabels = getTaskTimeLabels(item);
 
-                  return (
+                return (
                 <TaskItemCard
                   key={item.task.id}
                   theme={theme}
@@ -980,7 +1007,9 @@ export default function App() {
                           )
                       : undefined
                   }
-                  timeSummaryLabel={timeSummaryLabel}
+                  timeSummaryLabel={timeLabels.timeSummaryLabel}
+                  openedAtLabel={timeLabels.openedAtLabel}
+                  checkedAtLabel={timeLabels.checkedAtLabel}
                   onDeletePress={() => setPendingDismissItem(item)}
                   onPress={
                     item.status === 'IN_PROGRESS'
@@ -996,9 +1025,8 @@ export default function App() {
                             handleStatusPress(item.ticket.id, item.task.id, item.status, today)
                   }
                 />
-                  );
-                })()
-              ))
+                );
+              })
             )}
             {!loadingTasks && todayItems.length === 0 ? (
               <Text style={styles.emptyText}>오늘 표시할 테스크가 없습니다.</Text>
@@ -1157,7 +1185,10 @@ export default function App() {
 
             <View style={styles.panel}>
               <Text style={styles.caption}>{`${selectedDate} · ${filteredSelectedItems.length}개`}</Text>
-              {filteredSelectedItems.map((item) => (
+              {filteredSelectedItems.map((item) => {
+                const timeLabels = getTaskTimeLabels(item);
+
+                return (
                 <TaskItemCard
                   key={item.ticket.id}
                   theme={theme}
@@ -1179,7 +1210,9 @@ export default function App() {
                           )
                       : undefined
                   }
-                  checkedAtLabel={item.status === 'DONE' ? formatOptionalTime(item.checkedAt) : null}
+                  timeSummaryLabel={timeLabels.timeSummaryLabel}
+                  openedAtLabel={timeLabels.openedAtLabel}
+                  checkedAtLabel={timeLabels.checkedAtLabel}
                   onPress={
                     item.status === 'IN_PROGRESS'
                       ? () =>
@@ -1199,7 +1232,8 @@ export default function App() {
                             )
                   }
                 />
-              ))}
+                );
+              })}
               {filteredSelectedItems.length === 0 ? (
                 <Text style={styles.emptyText}>선택한 날짜에 필터 조건과 맞는 테스크가 없습니다.</Text>
               ) : null}
@@ -2204,19 +2238,19 @@ const createStyles = (theme: AppTheme) => StyleSheet.create({
     flexWrap: 'wrap',
   },
   calendarCell: {
-    minHeight: 84,
+    minHeight: 56,
     backgroundColor: theme.colors.calendarCellBackground,
     borderRadius: 16,
     borderWidth: 1,
     borderColor: theme.colors.calendarCellBorder,
-    paddingVertical: 8,
+    paddingVertical: 6,
     paddingHorizontal: 4,
     alignItems: 'center',
-    justifyContent: 'space-between',
+    justifyContent: 'center',
   },
   calendarCellMonth: {
     width: '14.285%',
-    marginBottom: 6,
+    marginBottom: 4,
   },
   calendarCellMuted: {
     opacity: 0.45,

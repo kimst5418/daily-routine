@@ -75,8 +75,11 @@ export function buildMonthGrid(dateKey: string) {
   const firstDay = monthStart.getDay();
   const gridStart = new Date(monthStart);
   gridStart.setDate(monthStart.getDate() - firstDay);
+  const monthEnd = new Date(monthStart.getFullYear(), monthStart.getMonth() + 1, 0);
+  const totalVisibleDays = firstDay + monthEnd.getDate();
+  const weekCount = Math.max(5, Math.ceil(totalVisibleDays / 7));
 
-  return Array.from({ length: 42 }, (_, index) => {
+  return Array.from({ length: weekCount * 7 }, (_, index) => {
     const current = new Date(gridStart);
     current.setDate(gridStart.getDate() + index);
     return toDateKey(current);
