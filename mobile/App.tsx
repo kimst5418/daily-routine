@@ -4,6 +4,7 @@ import Svg, { Path } from 'react-native-svg';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import {
   ActivityIndicator,
+  Animated,
   KeyboardAvoidingView,
   Modal,
   Platform,
@@ -323,7 +324,8 @@ export default function App() {
   const [tasks, setTasks] = useState<Task[]>([]);
   const [rules, setRules] = useState<ReminderRule[]>([]);
   const [showReminderSettings, setShowReminderSettings] = useState(false);
-  const [ruleDelayMinutes, setRuleDelayMinutes] = useState('60');
+  const [ruleDelayHours, setRuleDelayHours] = useState('1');
+  const [ruleDelayMinutesPart, setRuleDelayMinutesPart] = useState('0');
   const [ruleRepeatMinutes, setRuleRepeatMinutes] = useState('3');
   const [ruleMaxAlertCount, setRuleMaxAlertCount] = useState('5');
   const [ruleMessage, setRuleMessage] = useState('');
@@ -331,6 +333,10 @@ export default function App() {
   const [savingRule, setSavingRule] = useState(false);
   const [settingsCategoryDraft, setSettingsCategoryDraft] = useState('');
   const [settingsMessage, setSettingsMessage] = useState('');
+  const delayHoursShake = useRef(new Animated.Value(0)).current;
+  const delayMinutesShake = useRef(new Animated.Value(0)).current;
+  const repeatMinutesShake = useRef(new Animated.Value(0)).current;
+  const maxAlertCountShake = useRef(new Animated.Value(0)).current;
 
   const today = toDateKey(new Date());
   const todayDoneCount = todayItems.filter((item) => item.status === 'DONE').length;
@@ -359,7 +365,7 @@ export default function App() {
   > = {
     today: {
       eyebrow: '',
-      title: '오늘',
+      title: '매일 한칸',
       subtitle:
         todayItems.length > 0
           ? `${todayDoneCount}개 완료, ${todayInProgressCount}개 진행 중`
@@ -399,7 +405,8 @@ export default function App() {
   }
 
   function resetReminderForm() {
-    setRuleDelayMinutes('60');
+    setRuleDelayHours('1');
+    setRuleDelayMinutesPart('0');
     setRuleRepeatMinutes('3');
     setRuleMaxAlertCount('5');
     setRuleMessage('');
@@ -470,6 +477,73 @@ export default function App() {
 
   function shiftMonthPickerYear(amount: number) {
     setMonthPickerYear((prev) => prev + amount);
+  }
+
+  function playShake(animation: Animated.Value) {
+    animation.stopAnimation();
+    animation.setValue(0);
+    Animated.sequence([
+      Animated.timing(animation, {
+        toValue: 8,
+        duration: 50,
+        useNativeDriver: true,
+      }),
+      Animated.timing(animation, {
+        toValue: -8,
+        duration: 50,
+        useNativeDriver: true,
+      }),
+      Animated.timing(animation, {
+        toValue: 6,
+        duration: 45,
+        useNativeDriver: true,
+      }),
+      Animated.timing(animation, {
+        toValue: -4,
+        duration: 45,
+        useNativeDriver: true,
+      }),
+      Animated.timing(animation, {
+        toValue: 0,
+        duration: 40,
+        useNativeDriver: true,
+      }),
+    ]).start();
+  }
+
+  function clampNumericInput(
+    value: string,
+    maxValue: number,
+    animation: Animated.Value
+  ) {
+    const digitsOnly = value.replace(/[^0-9]/g, '');
+    if (!digitsOnly) {
+      return '';
+    }
+
+    const numericValue = Number(digitsOnly);
+    if (numericValue > maxValue) {
+      playShake(animation);
+      return String(maxValue);
+    }
+
+    return digitsOnly;
+  }
+
+  function handleDelayHoursChange(value: string) {
+    setRuleDelayHours(clampNumericInput(value, 23, delayHoursShake));
+  }
+
+  function handleDelayMinutesChange(value: string) {
+    setRuleDelayMinutesPart(clampNumericInput(value, 59, delayMinutesShake));
+  }
+
+  function handleRepeatMinutesChange(value: string) {
+    setRuleRepeatMinutes(clampNumericInput(value, 10, repeatMinutesShake));
+  }
+
+  function handleMaxAlertCountChange(value: string) {
+    setRuleMaxAlertCount(clampNumericInput(value, 10, maxAlertCountShake));
   }
 
   function getTaskTimeLabels(item: TodayTaskItem) {
@@ -770,9 +844,21 @@ export default function App() {
   }
 
   function validateReminderSettings() {
-    const delayMinutes = Number(ruleDelayMinutes);
+    const delayHours = Number(ruleDelayHours || '0');
+    const delayMinutesPart = Number(ruleDelayMinutesPart || '0');
+    const delayMinutes = delayHours * 60 + delayMinutesPart;
     const repeatMinutes = Number(ruleRepeatMinutes);
     const maxAlertCount = Number(ruleMaxAlertCount);
+
+    if (
+      !Number.isFinite(delayHours) ||
+      delayHours < 0 ||
+      !Number.isFinite(delayMinutesPart) ||
+      delayMinutesPart < 0 ||
+      delayMinutesPart > 59
+    ) {
+      return { error: '지연 시간은 0시간 0분 이상, 분은 59 이하로 입력해주세요.' };
+    }
 
     if (!Number.isFinite(delayMinutes) || delayMinutes < 1) {
       return { error: '지연 시간은 최소 1분 이상이어야 합니다.' };
@@ -805,8 +891,9 @@ export default function App() {
     setRepeatType(task.repeatType);
     setRepeatDays(task.repeatType === 'WEEKLY_DAYS' ? task.repeatDays : [1, 2, 3, 4, 5]);
     if (linkedRule) {
+      setRuleDelayHours(String(Math.floor(linkedRule.delayMinutes / 60)));
+      setRuleDelayMinutesPart(String(linkedRule.delayMinutes % 60));
       setShowReminderSettings(true);
-      setRuleDelayMinutes(String(linkedRule.delayMinutes));
       setRuleRepeatMinutes(String(linkedRule.repeatIntervalMinutes ?? 3));
       setRuleMaxAlertCount(String(linkedRule.maxAlertCount));
       setRuleMessage(linkedRule.message);
@@ -817,6 +904,9 @@ export default function App() {
     setRuleFeedback('');
     setFormMessage('수정할 내용을 바꾼 뒤 저장해주세요.');
     setActiveTab('tasks');
+    requestAnimationFrame(() => {
+      scrollViewRef.current?.scrollTo({ y: 0, animated: true });
+    });
   }
 
   async function handleDeactivateTask(task: Task) {
@@ -1393,7 +1483,7 @@ export default function App() {
               ) : null}
 
               <View style={styles.filterSummaryRow}>
-                <Text style={styles.fieldLabel}>알림 설정</Text>
+                <Text style={styles.fieldLabel}>종료 알림 설정</Text>
                 <Pressable
                   style={styles.filterResetButton}
                   onPress={() => {
@@ -1432,33 +1522,66 @@ export default function App() {
                   </View>
 
                   <View style={styles.inlineInputs}>
-                    <View style={styles.reminderInputBox}>
-                      <Text style={styles.compactFieldLabel}>지연(분)</Text>
-                      <TextInput
-                        style={styles.input}
-                        keyboardType="numeric"
-                        value={ruleDelayMinutes}
-                        onChangeText={setRuleDelayMinutes}
-                      />
+                    <View style={[styles.reminderInputBox, styles.delayInputBox]}>
+                      <Text style={styles.compactFieldLabel}>지연시간(시간:분)</Text>
+                      <View style={styles.delayInputRow}>
+                        <Animated.View
+                          style={[
+                            styles.delayInputField,
+                            { transform: [{ translateX: delayHoursShake }] },
+                          ]}
+                        >
+                          <TextInput
+                            style={[styles.input, styles.delayInputText]}
+                            keyboardType="numeric"
+                            value={ruleDelayHours}
+                            onChangeText={handleDelayHoursChange}
+                          />
+                        </Animated.View>
+                        <Text style={styles.delaySeparator}>:</Text>
+                        <Animated.View
+                          style={[
+                            styles.delayInputField,
+                            { transform: [{ translateX: delayMinutesShake }] },
+                          ]}
+                        >
+                          <TextInput
+                            style={styles.input}
+                            keyboardType="numeric"
+                            value={ruleDelayMinutesPart}
+                            onChangeText={handleDelayMinutesChange}
+                          />
+                        </Animated.View>
+                      </View>
                     </View>
-                    <View style={styles.reminderInputBox}>
+                    <Animated.View
+                      style={[
+                        styles.reminderInputBox,
+                        { transform: [{ translateX: repeatMinutesShake }] },
+                      ]}
+                    >
                       <Text style={styles.compactFieldLabel}>반복(분)</Text>
                       <TextInput
                         style={styles.input}
                         keyboardType="numeric"
                         value={ruleRepeatMinutes}
-                        onChangeText={setRuleRepeatMinutes}
+                        onChangeText={handleRepeatMinutesChange}
                       />
-                    </View>
-                    <View style={styles.reminderInputBox}>
+                    </Animated.View>
+                    <Animated.View
+                      style={[
+                        styles.reminderInputBox,
+                        { transform: [{ translateX: maxAlertCountShake }] },
+                      ]}
+                    >
                       <Text style={styles.compactFieldLabel}>최대 횟수</Text>
                       <TextInput
                         style={styles.input}
                         keyboardType="numeric"
                         value={ruleMaxAlertCount}
-                        onChangeText={setRuleMaxAlertCount}
+                        onChangeText={handleMaxAlertCountChange}
                       />
-                    </View>
+                    </Animated.View>
                   </View>
 
                   <Text style={styles.fieldLabel}>알림 메시지</Text>
@@ -1523,7 +1646,7 @@ export default function App() {
 
                           return (
                             <Text style={styles.taskRepeat}>
-                              알림: {linkedRule.delayMinutes}분 후 / {linkedRule.repeatIntervalMinutes ?? '-'}분 간격 / 최대 {linkedRule.maxAlertCount}회
+                              알림: {formatDelayMinutes(linkedRule.delayMinutes)} 후 / {linkedRule.repeatIntervalMinutes ?? '-'}분 간격 / 최대 {linkedRule.maxAlertCount}회
                             </Text>
                           );
                         })()}
@@ -2305,10 +2428,31 @@ const createStyles = (theme: AppTheme) => StyleSheet.create({
   inlineInputs: {
     flexDirection: 'row',
     gap: 10,
+    alignItems: 'flex-start',
+  },
+  delayInputRow: {
+    flexDirection: 'row',
+    gap: 8,
+    alignItems: 'center',
+  },
+  delayInputField: {
+    flex: 1,
+  },
+  delayInputText: {
+    textAlign: 'right',
   },
   reminderInputBox: {
     flex: 1,
     gap: 6,
+  },
+  delayInputBox: {
+    flex: 1.8,
+  },
+  delaySeparator: {
+    color: theme.colors.textSecondary,
+    fontSize: 18,
+    fontWeight: '700',
+    paddingHorizontal: 2,
   },
   inlineActionRow: {
     flexDirection: 'row',
